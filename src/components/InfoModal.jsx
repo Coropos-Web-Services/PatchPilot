@@ -84,42 +84,50 @@ const InfoModal = ({ isOpen, onClose }) => {
              
              <div className="space-y-4">
                <div className="bg-white/5 rounded-lg p-4">
-                 <h4 className="font-semibold text-white mb-2">PatchPilot Application</h4>
-                 <p className="text-gray-300 text-sm mb-2">
-                   Copyright © 2025 Coropos Web Services & Edward Quigley. All rights reserved.
-                 </p>
-                 <p className="text-gray-400 text-xs mb-3">
-                   This application is licensed under the MIT License.
-                 </p>
-                 <div className="bg-black/30 rounded p-3 text-xs font-mono text-gray-300">
-                   <p className="mb-2">MIT License</p>
-                   <p className="mb-2">Copyright (c) 2025 Coropos Web Services & Edward Quigley</p>
-                   <p className="mb-2">
-                     Permission is hereby granted, free of charge, to any person obtaining a copy
-                     of this software and associated documentation files (the "Software"), to deal
-                     in the Software without restriction, including without limitation the rights
-                     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-                     copies of the Software, and to permit persons to whom the Software is
-                     furnished to do so, subject to the following conditions:
-                   </p>
-                   <p className="text-xs text-gray-400">
-                     The above copyright notice and this permission notice shall be included in all
-                     copies or substantial portions of the Software.
-                   </p>
-                 </div>
-                 <div className="mt-3 flex items-center space-x-2">
-                   <ExternalLink size={14} className="text-blue-400" />
-                   <a 
-                     href="https://github.com/coropos/patchpilot/blob/main/LICENSE" 
-                     target="_blank" 
-                     rel="noopener noreferrer"
-                     className="text-blue-400 hover:text-blue-300 text-sm"
-                   >
-                     View Full License on GitHub
-                   </a>
-                 </div>
-               </div>
+  <h4 className="font-semibold text-white mb-2">PatchPilot Application</h4>
+  <div className="bg-black/30 rounded p-3 text-xs font-mono text-gray-300">
+    <p className="mb-2">PatchPilot License v1.0</p>
+    <p className="mb-2">Copyright (c) 2025 Coropos Web Services</p>
+    <p className="mb-2">
+      PatchPilot is provided as a <strong>free</strong>, <strong>personal-use-only</strong> tool. You may <strong>use</strong> and <strong>modify</strong> this software for your own purposes, but you <strong>may not</strong> sell it, redistribute it, or share modified or unmodified copies without written permission from the original author.
+    </p>
+    <p className="mb-2">
+      <strong>Permissions</strong><br />
+      ✅ Use PatchPilot on your personal devices<br />
+      ✅ Modify the source code for private, non-commercial use only<br />
+      ✅ Receive updates from the official developer
+    </p>
+    <p className="mb-2">
+      <strong>Restrictions</strong><br />
+      ❌ Use PatchPilot or its code for commercial purposes<br />
+      ❌ Sell, rent, sublicense, or monetize PatchPilot in any way<br />
+      ❌ Distribute or share modified or unmodified copies<br />
+      ❌ Host or package PatchPilot for others without permission
+    </p>
+    <p className="mb-2">
+      PatchPilot and all associated content remain the exclusive intellectual property of EJ Quigley and Coropos Web Services. Modifying or using this project does not grant you any ownership rights.
+    </p>
+    <p className="mb-2">
+      The terms of this license may change in the future. Continued use of PatchPilot after any changes implies acceptance of the new terms.
+    </p>
+    <p className="mb-2">
+      All updates to PatchPilot must be obtained through the official distribution channels or repositories provided by Coropos Web Services. Modified versions must not be distributed under any circumstance.
+    </p>
+    <p className="text-xs text-gray-400">
+      To request permissions or commercial licensing, contact the original author: equigley@coroposws.com
+    </p>
+  </div>
 
+  <div className="mt-3 flex items-center space-x-2">
+    <ExternalLink size={14} className="text-blue-400" />
+    <button 
+      onClick={() => open("https://github.com/coropos-web-services/patchpilot/blob/main/LICENSE.md")} 
+      className="text-blue-400 hover:text-blue-300 text-sm"
+    >
+      View Full License on GitHub
+    </button>
+  </div>
+</div>
                <div className="bg-white/5 rounded-lg p-4">
                  <h4 className="font-semibold text-white mb-2">Open Source Dependencies</h4>
                  <div className="space-y-3 text-sm">
