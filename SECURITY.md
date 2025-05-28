@@ -51,13 +51,11 @@ PatchPilot only accesses files you **explicitly select or drop** into the UI. It
 If you discover a security vulnerability in PatchPilot, **please report it privately** to the project maintainer.
 
 ### 📧 Contact:
-```
 
 EJ Quigley
 [GitHub](https://github.com/Coropos-Web-Services)
 Email: [equigley@coroposws.com](mailto:equigley@coroposws.com)
 
-```
 
 Please do **not** open public issues for security flaws. Disclose them privately to allow time for a proper fix.
 
