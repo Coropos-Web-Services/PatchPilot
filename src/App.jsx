@@ -5,7 +5,11 @@ import FileTracker from './components/FileTracker';
 import CodeEditor from './components/CodeEditor';
 import LoadingScreen from './components/LoadingScreen';
 import InfoModal from './components/InfoModal';
-import { Menu, FileText, X, Info } from 'lucide-react';
+import UpdateModal from './components/UpdateModal';
+import { storageUtils } from './utils/storageUtils';
+import { aiService } from './services/aiService';
+import { updateService } from './services/updateService';
+import { Menu, FileText, X, Info, Brain } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -19,25 +23,112 @@ function App() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorFile, setEditorFile] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [aiStatus, setAIStatus] = useState({ available: false, models: [] });
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
 
-  // Initialize with a default chat
+  // Initialize app with stored data or defaults
   useEffect(() => {
-    const defaultChat = {
-      id: 'default-chat',
-      name: 'New Chat',
-      messages: [{
-        id: 1,
-        type: 'ai',
-        content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file onto this window, or type a message to get started.",
-        timestamp: new Date()
-      }],
-      fileCount: 0,
-      lastModified: Date.now()
+    const initializeApp = () => {
+      try {
+        // Load settings
+        const settings = storageUtils.loadSettings();
+        setSidebarOpen(settings.sidebarOpen);
+        setFileTrackerOpen(settings.fileTrackerOpen);
+
+        // Load chats
+        const storedChats = storageUtils.loadChats();
+        const storedCurrentChatId = storageUtils.loadCurrentChatId();
+
+        if (storedChats.length > 0) {
+          setChats(storedChats);
+          
+          // Set current chat ID, or use the first chat if stored ID doesn't exist
+          const validChatId = storedChats.find(chat => chat.id === storedCurrentChatId)?.id || storedChats[0].id;
+          setCurrentChatId(validChatId);
+          
+          // Load files for current chat
+          const files = storageUtils.loadChatFiles(validChatId);
+          setChatFiles(files);
+        } else {
+          // Create default chat if none exist
+          const defaultChat = {
+            id: 'default-chat',
+            name: 'New Chat',
+            messages: [{
+              id: 1,
+              type: 'ai',
+              content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file onto this window, or type a message to get started.",
+              timestamp: new Date()
+            }],
+            fileCount: 0,
+            lastModified: Date.now()
+          };
+          
+          const initialChats = [defaultChat];
+          setChats(initialChats);
+          setCurrentChatId(defaultChat.id);
+          setChatFiles([]);
+          
+          // Save initial state
+          storageUtils.saveChats(initialChats);
+          storageUtils.saveCurrentChatId(defaultChat.id);
+        }
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+        // Fallback to default state
+        const defaultChat = {
+          id: 'default-chat',
+          name: 'New Chat',
+          messages: [{
+            id: 1,
+            type: 'ai',
+            content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file onto this window, or type a message to get started.",
+            timestamp: new Date()
+          }],
+          fileCount: 0,
+          lastModified: Date.now()
+        };
+        
+        setChats([defaultChat]);
+        setCurrentChatId(defaultChat.id);
+        setChatFiles([]);
+      }
     };
-    
-    setChats([defaultChat]);
-    setCurrentChatId('default-chat');
+
+    initializeApp();
   }, []);
+
+  // Save chats whenever they change
+  useEffect(() => {
+    if (chats.length > 0) {
+      storageUtils.saveChats(chats);
+    }
+  }, [chats]);
+
+  // Save current chat ID whenever it changes
+  useEffect(() => {
+    if (currentChatId) {
+      storageUtils.saveCurrentChatId(currentChatId);
+    }
+  }, [currentChatId]);
+
+  // Save chat files whenever they change
+  useEffect(() => {
+    if (currentChatId && chatFiles.length >= 0) {
+      storageUtils.saveChatFiles(currentChatId, chatFiles);
+    }
+  }, [currentChatId, chatFiles]);
+
+  // Save settings when sidebar states change
+  useEffect(() => {
+    const settings = {
+      sidebarOpen,
+      fileTrackerOpen,
+      theme: 'dark'
+    };
+    storageUtils.saveSettings(settings);
+  }, [sidebarOpen, fileTrackerOpen]);
 
   const handleNewChat = () => {
     const newChat = {
@@ -53,32 +144,46 @@ function App() {
       lastModified: Date.now()
     };
     
-    setChats(prev => [newChat, ...prev]);
+    const updatedChats = [newChat, ...chats];
+    setChats(updatedChats);
     setCurrentChatId(newChat.id);
     setChatFiles([]); // Clear files for new chat
   };
 
   const handleSelectChat = (chatId) => {
     setCurrentChatId(chatId);
-    // Load files for this chat (in real implementation, this would come from storage)
-    setChatFiles([]);
+    // Load files for selected chat
+    const files = storageUtils.loadChatFiles(chatId);
+    setChatFiles(files);
   };
 
   const handleDeleteChat = (chatId) => {
     if (chats.length <= 1) return; // Don't delete the last chat
     
-    setChats(prev => prev.filter(chat => chat.id !== chatId));
+    const updatedChats = chats.filter(chat => chat.id !== chatId);
+    setChats(updatedChats);
+    
+    // Delete associated files
+    storageUtils.deleteChatFiles(chatId);
     
     if (currentChatId === chatId) {
-      const remainingChats = chats.filter(chat => chat.id !== chatId);
-      setCurrentChatId(remainingChats[0]?.id || null);
+      const newCurrentChatId = updatedChats[0]?.id || null;
+      setCurrentChatId(newCurrentChatId);
+      
+      if (newCurrentChatId) {
+        const files = storageUtils.loadChatFiles(newCurrentChatId);
+        setChatFiles(files);
+      } else {
+        setChatFiles([]);
+      }
     }
   };
 
   const handleRenameChat = (chatId, newName) => {
-    setChats(prev => prev.map(chat => 
+    const updatedChats = chats.map(chat => 
       chat.id === chatId ? { ...chat, name: newName } : chat
-    ));
+    );
+    setChats(updatedChats);
   };
 
   const handleFileAdded = (file) => {
@@ -103,7 +208,7 @@ function App() {
     // Update chat file count
     setChats(prev => prev.map(chat => 
       chat.id === currentChatId 
-        ? { ...chat, fileCount: chatFiles.length + 1, lastModified: Date.now() }
+        ? { ...chat, fileCount: (chatFiles.length + 1), lastModified: Date.now() }
         : chat
     ));
   };
@@ -122,6 +227,27 @@ function App() {
       mode: 'edit'
     });
     setEditorOpen(true);
+  };
+
+  // Add message to current chat and save
+  const handleAddMessage = (message) => {
+    setChats(prev => prev.map(chat => 
+      chat.id === currentChatId 
+        ? { 
+            ...chat, 
+            messages: [...chat.messages, message],
+            lastModified: Date.now()
+          }
+        : chat
+    ));
+  };
+
+  // Handle AI naming of chats
+  const handleChatRename = (chatId, code, filename, userMessage = '') => {
+    const newName = aiService.generateChatName(code, filename, userMessage);
+    setChats(prev => prev.map(chat => 
+      chat.id === chatId ? { ...chat, name: newName } : chat
+    ));
   };
 
   const currentChat = chats.find(chat => chat.id === currentChatId);
@@ -204,6 +330,20 @@ function App() {
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-green-300 font-medium">Offline Ready</span>
                 </div>
+
+                {/* AI Status */}
+                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${
+                  aiStatus.available 
+                    ? 'bg-blue-500/20 border-blue-500/30'
+                    : 'bg-orange-500/20 border-orange-500/30'
+                }`}>
+                  <Brain size={12} className={aiStatus.available ? 'text-blue-400' : 'text-orange-400'} />
+                  <span className={`text-xs font-medium ${
+                    aiStatus.available ? 'text-blue-300' : 'text-orange-300'
+                  }`}>
+                    {aiStatus.available ? 'AI Ready' : 'Basic Mode'}
+                  </span>
+                </div>
               </div>
             </div>
           </header>
@@ -215,6 +355,9 @@ function App() {
               initialMessages={currentChat?.messages || []}
               onFileAdded={handleFileAdded}
               onDragStateChange={setIsDragOver}
+              onMessageAdded={handleAddMessage}
+              onChatRename={handleChatRename}
+              currentChatId={currentChatId}
             />
           </main>
         </div>
@@ -240,6 +383,13 @@ function App() {
         <InfoModal
           isOpen={showInfoModal}
           onClose={() => setShowInfoModal(false)}
+        />
+
+        {/* Update Modal */}
+        <UpdateModal
+          isOpen={showUpdateModal}
+          onClose={() => setShowUpdateModal(false)}
+          updateInfo={updateInfo}
         />
       </div>
     </div>

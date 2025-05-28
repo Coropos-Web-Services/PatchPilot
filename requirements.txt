@@ -1,0 +1,23 @@
+# PatchPilot Python Backend Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies
+subprocess32>=3.5.4; python_version < '3.3'
+pathlib2>=2.3.7; python_version < '3.4'
+
+# Static analysis tools (optional but recommended)
+pylint>=2.17.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# JavaScript/TypeScript linting (install via npm)
+# npm install -g eslint
+# npm install -g @typescript-eslint/parser @typescript-eslint/eslint-plugin
+
+# JSON validation
+jsonschema>=4.17.0
+
+# Additional language support (optional)
+# For Java: install checkstyle
+# For C/C++: install cppcheck  
+# For Go: install golint

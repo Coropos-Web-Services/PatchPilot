@@ -37,13 +37,14 @@ const InfoModal = ({ isOpen, onClose }) => {
              
              <h4 className="font-semibold text-white mb-3">Key Features</h4>
              <ul className="text-gray-300 text-sm space-y-2">
-               <li>• Chat-based code review and analysis</li>
+               <li>• Conversational AI code review and analysis</li>
                <li>• Support for 20+ programming languages</li>
                <li>• Built-in code editor with syntax highlighting</li>
+               <li>• Interactive code improvement workflow</li>
                <li>• File creation and management</li>
                <li>• Drag & drop file support</li>
-               <li>• Offline-capable operation</li>
-               <li>• Real-time file tracking</li>
+               <li>• Offline-capable operation with Ollama</li>
+               <li>• Real-time file tracking and context awareness</li>
              </ul>
            </div>
 
@@ -54,8 +55,23 @@ const InfoModal = ({ isOpen, onClose }) => {
                <li>• Learning and educational purposes</li>
                <li>• Roblox/LuaU script development</li>
                <li>• Quick prototyping and experimentation</li>
-               <li>• Best practice guidance</li>
+               <li>• Best practice guidance and mentorship</li>
+               <li>• Bug fixing and performance optimization</li>
              </ul>
+           </div>
+
+           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+             <h4 className="font-semibold text-blue-300 mb-3">Created By</h4>
+             <div className="space-y-2 text-blue-100 text-sm">
+               <div>
+                 <p className="font-medium">Coropos Web Services</p>
+                 <p className="text-blue-200 text-xs">Leading web development and AI solutions</p>
+               </div>
+               <div>
+                 <p className="font-medium">Edward Quigley</p>
+                 <p className="text-blue-200 text-xs">Lead Developer & AI Integration Specialist</p>
+               </div>
+             </div>
            </div>
          </div>
        );
@@ -70,12 +86,38 @@ const InfoModal = ({ isOpen, onClose }) => {
                <div className="bg-white/5 rounded-lg p-4">
                  <h4 className="font-semibold text-white mb-2">PatchPilot Application</h4>
                  <p className="text-gray-300 text-sm mb-2">
-                   Copyright © 2025 PatchPilot. All rights reserved.
+                   Copyright © 2025 Coropos Web Services & Edward Quigley. All rights reserved.
                  </p>
-                 <p className="text-gray-400 text-xs">
-                   This application is provided as-is for educational and development purposes. 
-                   The software is distributed under a proprietary license.
+                 <p className="text-gray-400 text-xs mb-3">
+                   This application is licensed under the MIT License.
                  </p>
+                 <div className="bg-black/30 rounded p-3 text-xs font-mono text-gray-300">
+                   <p className="mb-2">MIT License</p>
+                   <p className="mb-2">Copyright (c) 2025 Coropos Web Services & Edward Quigley</p>
+                   <p className="mb-2">
+                     Permission is hereby granted, free of charge, to any person obtaining a copy
+                     of this software and associated documentation files (the "Software"), to deal
+                     in the Software without restriction, including without limitation the rights
+                     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+                     copies of the Software, and to permit persons to whom the Software is
+                     furnished to do so, subject to the following conditions:
+                   </p>
+                   <p className="text-xs text-gray-400">
+                     The above copyright notice and this permission notice shall be included in all
+                     copies or substantial portions of the Software.
+                   </p>
+                 </div>
+                 <div className="mt-3 flex items-center space-x-2">
+                   <ExternalLink size={14} className="text-blue-400" />
+                   <a 
+                     href="https://github.com/coropos/patchpilot/blob/main/LICENSE" 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     className="text-blue-400 hover:text-blue-300 text-sm"
+                   >
+                     View Full License on GitHub
+                   </a>
+                 </div>
                </div>
 
                <div className="bg-white/5 rounded-lg p-4">
@@ -87,7 +129,7 @@ const InfoModal = ({ isOpen, onClose }) => {
                    </div>
                    <div>
                      <p className="text-blue-300 font-medium">Tauri</p>
-                     <p className="text-gray-400 text-xs">MIT License - Tauri Contributors</p>
+                     <p className="text-gray-400 text-xs">Apache License 2.0 & MIT License - Tauri Contributors</p>
                    </div>
                    <div>
                      <p className="text-blue-300 font-medium">Tailwind CSS</p>
@@ -100,6 +142,10 @@ const InfoModal = ({ isOpen, onClose }) => {
                    <div>
                      <p className="text-blue-300 font-medium">Vite</p>
                      <p className="text-gray-400 text-xs">MIT License - Evan You</p>
+                   </div>
+                   <div>
+                     <p className="text-blue-300 font-medium">Ollama</p>
+                     <p className="text-gray-400 text-xs">MIT License - Ollama Contributors</p>
                    </div>
                  </div>
                </div>
@@ -135,6 +181,24 @@ const InfoModal = ({ isOpen, onClose }) => {
                    <li>• <strong>No crash reporting:</strong> No automatic error reporting to external services</li>
                  </ul>
                </div>
+
+               <div className="bg-white/5 rounded-lg p-4">
+                 <h4 className="font-semibold text-white mb-3">Local AI Processing</h4>
+                 <ul className="text-gray-300 text-sm space-y-2">
+                   <li>• <strong>Ollama Integration:</strong> AI models run entirely on your machine</li>
+                   <li>• <strong>No Cloud Dependencies:</strong> No data sent to OpenAI, Google, or other services</li>
+                   <li>• <strong>Offline Operation:</strong> Works completely without internet after setup</li>
+                   <li>• <strong>Your Data, Your Control:</strong> All analysis happens locally</li>
+                 </ul>
+               </div>
+
+               <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                 <h4 className="font-semibold text-blue-300 mb-3">Update Checks</h4>
+                 <p className="text-blue-100 text-sm">
+                   PatchPilot periodically checks GitHub for updates to provide you with the latest features 
+                   and security improvements. Only version information is transmitted during these checks.
+                 </p>
+               </div>
              </div>
            </div>
          </div>
@@ -149,22 +213,81 @@ const InfoModal = ({ isOpen, onClose }) => {
              <div className="space-y-4">
                <div className="bg-white/5 rounded-lg p-4">
                  <h4 className="font-semibold text-white mb-3">Development Team</h4>
-                 <p className="text-gray-300 text-sm mb-3">
-                   PatchPilot was developed as an innovative code review solution, combining 
-                   modern desktop technologies with AI-powered analysis capabilities.
+                 <div className="space-y-3">
+                   <div className="flex items-center space-x-3">
+                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                       <span className="text-white font-bold text-sm">CWS</span>
+                     </div>
+                     <div>
+                       <p className="text-white font-medium">Coropos Web Services</p>
+                       <p className="text-gray-400 text-sm">Development Studio & AI Innovation</p>
+                     </div>
+                   </div>
+                   <div className="flex items-center space-x-3">
+                     <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                       <span className="text-white font-bold text-sm">EQ</span>
+                     </div>
+                     <div>
+                       <p className="text-white font-medium">Edward Quigley</p>
+                       <p className="text-gray-400 text-sm">Lead Developer, AI Integration & UI/UX Design</p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-4">
+                 <h4 className="font-semibold text-blue-300 mb-3">Project Vision</h4>
+                 <p className="text-blue-100 text-sm leading-relaxed">
+                   PatchPilot was created to democratize AI-powered code review and make advanced 
+                   development tools accessible to everyone. Our mission is to help developers 
+                   learn, improve, and create better software through intelligent assistance.
                  </p>
                </div>
 
                <div className="bg-white/5 rounded-lg p-4">
                  <h4 className="font-semibold text-white mb-3">Special Thanks</h4>
                  <ul className="text-gray-300 text-sm space-y-2">
-                   <li>• The React team for the amazing UI framework</li>
-                   <li>• Tauri contributors for the desktop application framework</li>
-                   <li>• The Rust community for the powerful backend capabilities</li>
-                   <li>• Tailwind CSS team for the beautiful styling system</li>
-                   <li>• Lucide for the comprehensive icon library</li>
-                   <li>• The open source community for making this possible</li>
+                   <li>• The <strong>Ollama team</strong> for making local AI accessible</li>
+                   <li>• <strong>Meta AI</strong> and the CodeLlama contributors</li>
+                   <li>• The <strong>React</strong> team for the amazing UI framework</li>
+                   <li>• <strong>Tauri contributors</strong> for the desktop application framework</li>
+                   <li>• The <strong>Rust community</strong> for powerful backend capabilities</li>
+                   <li>• <strong>Tailwind CSS</strong> team for the beautiful styling system</li>
+                   <li>• <strong>Lucide</strong> for the comprehensive icon library</li>
+                   <li>• The <strong>open source community</strong> for making this possible</li>
                  </ul>
+               </div>
+
+               <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                 <h4 className="font-semibold text-green-300 mb-3">Community & Support</h4>
+                 <div className="space-y-2 text-green-100 text-sm">
+                   <div className="flex items-center space-x-2">
+                     <Github size={14} />
+                     <a 
+                       href="https://github.com/coropos-web-services/patchpilot" 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="text-green-300 hover:text-green-200"
+                     >
+                       GitHub Repository
+                     </a>
+                   </div>
+                   <div className="flex items-center space-x-2">
+                     <ExternalLink size={14} />
+                     <a 
+                       href="https://coropos.com" 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="text-green-300 hover:text-green-200"
+                     >
+                       Coropos Web Services
+                     </a>
+                   </div>
+                   <div className="flex items-center space-x-2">
+                     <Mail size={14} />
+                     <span className="text-green-200">info@coropos.com</span>
+                   </div>
+                 </div>
                </div>
              </div>
            </div>
@@ -221,7 +344,8 @@ const InfoModal = ({ isOpen, onClose }) => {
 
        <div className="flex items-center justify-between p-6 border-t border-white/10 bg-black/20">
          <div className="text-sm text-gray-400">
-           <p>© 2025 PatchPilot. Built with React & Tauri.</p>
+           <p>© 2025 Coropos Web Services & Edward Quigley.</p>
+           <p className="text-xs">Built with React, Tauri & PatchPilot AI ❤️</p>
          </div>
          <button onClick={onClose} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-white font-medium">
            Close

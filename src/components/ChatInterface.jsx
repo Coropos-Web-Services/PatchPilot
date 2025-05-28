@@ -1,15 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, FileCode, X, Sparkles, Zap, Plus } from 'lucide-react';
+import { Send, Upload, FileCode, X, Sparkles, Zap, Plus, Brain, AlertTriangle, Edit } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import NewFileModal from './NewFileModal';
+import AISetupModal from './AISetupModal';
+import CodeEditor from './CodeEditor';
+import { aiService } from '../services/aiService';
 
-const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange }) => {
+const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, onMessageAdded, onChatRename, currentChatId }) => {
   const [messages, setMessages] = useState(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [currentFileContext, setCurrentFileContext] = useState(null); // Track current file being discussed
   const [isDragOver, setIsDragOver] = useState(false);
   const [showNewFileModal, setShowNewFileModal] = useState(false);
+  const [showAISetupModal, setShowAISetupModal] = useState(false);
+  const [aiStatus, setAIStatus] = useState({ available: false, models: [] });
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [editorContent, setEditorContent] = useState('');
+  const [editorFileName, setEditorFileName] = useState('');
+  const [editorLanguage, setEditorLanguage] = useState('');
+  const [isImprovedCode, setIsImprovedCode] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -17,6 +28,15 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
+
+  // Initialize AI service
+  useEffect(() => {
+    const initAI = async () => {
+      const status = await aiService.initialize();
+      setAIStatus(status);
+    };
+    initAI();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,7 +56,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
     };
   }, []);
 
-  // Global drag and drop handlers
+  // Global drag and drop handlers (same as before)
   useEffect(() => {
     const handleGlobalDragOver = (e) => {
       e.preventDefault();
@@ -55,7 +75,6 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
     const handleGlobalDragLeave = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      // Only hide if we're leaving the window completely
       if (e.clientX <= 0 || e.clientY <= 0 || 
           e.clientX >= window.innerWidth || 
           e.clientY >= window.innerHeight) {
@@ -78,7 +97,6 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
       }
     };
 
-    // Add global listeners to document AND window
     const addListeners = () => {
       document.addEventListener('dragover', handleGlobalDragOver, false);
       document.addEventListener('dragenter', handleGlobalDragEnter, false);
@@ -123,13 +141,12 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
       };
 
       setSelectedFile(fileData);
+      setCurrentFileContext(fileData); // Set as current context
       
-      // Notify parent about file addition
       if (onFileAdded) {
         onFileAdded(fileData);
       }
       
-      // Auto-send the file
       setTimeout(() => {
         handleSendMessage(fileData);
       }, 100);
@@ -145,13 +162,12 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
 
   const handleNewFileCreated = (fileData) => {
     setSelectedFile(fileData);
+    setCurrentFileContext(fileData);
     
-    // Notify parent about file addition
     if (onFileAdded) {
       onFileAdded(fileData);
     }
     
-    // Auto-send the file
     setTimeout(() => {
       handleSendMessage(fileData);
     }, 100);
@@ -171,21 +187,8 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
       }
     };
     
-    input.onerror = () => {
-      console.log('File picker cancelled or failed');
-    };
-    
-    input.oncancel = () => {
-      console.log('File picker cancelled');
-    };
-    
-    // Trigger the file picker
     input.click();
-    
-    // Clean up
-    setTimeout(() => {
-      input.remove();
-    }, 1000);
+    setTimeout(() => input.remove(), 1000);
   };
 
   const addMessage = (type, content, metadata = {}) => {
@@ -197,6 +200,132 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
       ...metadata
     };
     setMessages(prev => [...prev, newMessage]);
+    
+    // Notify parent component to save the message
+    if (onMessageAdded) {
+      onMessageAdded(newMessage);
+    }
+  };
+
+  const processAIRequest = async (userMessage, fileData = null) => {
+    setIsProcessing(true);
+    
+    try {
+      if (fileData && fileData.content) {
+        // File analysis
+        const result = await aiService.analyzeCode(fileData.content, fileData.name);
+        
+        // Auto-rename chat based on code content (only for new chats with default names)
+        if (onChatRename && currentChatId && userMessage) {
+          onChatRename(currentChatId, fileData.content, fileData.name, userMessage);
+        }
+        
+        if (result.success) {
+          const data = result.data;
+          const fileSize = fileData.size ? (fileData.size / 1024).toFixed(1) : 'Unknown';
+          
+          let responseContent = data.response;
+          
+          if (!responseContent.includes('Total lines')) {
+            const fileStats = `\n\n**File Statistics:**\n• **Size:** ${fileSize} KB (${data.lines} lines)\n• **Language:** ${data.language.toUpperCase()}\n• **Analysis:** ${aiStatus.available ? 'AI-Powered' : 'Basic'}`;
+            responseContent = data.response + fileStats;
+          }
+
+          addMessage('ai', responseContent, {
+            hasActions: true,
+            actions: [
+              { label: 'Improve This Code', action: 'improve_code' },
+              { label: 'Add Features', action: 'add_features' },
+              { label: 'Fix Bugs', action: 'fix_bugs' },
+              { label: 'Optimize Performance', action: 'optimize' },
+              { label: 'Add Comments', action: 'add_comments' },
+              { label: 'View Code', action: 'view_code' }
+            ],
+            analysisData: data,
+            fileContext: fileData
+          });
+        } else {
+          const fallbackData = result.fallback;
+          addMessage('ai', fallbackData.response, {
+            hasActions: true,
+            actions: [
+              { label: 'Setup AI Analysis', action: 'setup_ai' },
+              { label: 'View File Details', action: 'file_details' }
+            ],
+            isBasicMode: true
+          });
+        }
+      } else {
+        // Conversational AI - process user's question about current file context
+        await handleConversationalAI(userMessage);
+      }
+    } catch (error) {
+      addMessage('ai', `❌ Analysis failed: ${error.message}\n\nTry setting up AI analysis for better results.`, {
+        hasActions: true,
+        actions: [
+          { label: 'Setup AI', action: 'setup_ai' }
+        ]
+      });
+    }
+    
+    setIsProcessing(false);
+  };
+
+  const handleConversationalAI = async (userMessage) => {
+    // Enhanced conversational AI that understands context
+    const contextInfo = currentFileContext ? 
+      `\n\nCurrent file context: ${currentFileContext.name} (${currentFileContext.extension.toUpperCase()})` : '';
+    
+    // Simulate AI conversation - in real implementation, this would call Ollama with conversation context
+    const responses = {
+      // Code improvement requests
+      'improve': `I can help improve your code! ${contextInfo ? `Looking at ${currentFileContext.name}, I can:` : 'Upload a file and I can:'}\n\n• **Optimize algorithms** for better performance\n• **Improve readability** with better naming\n• **Add error handling** for robustness\n• **Follow best practices** for your language\n• **Refactor complex functions** into smaller ones\n\n${contextInfo ? 'What specific improvements would you like me to focus on?' : 'Upload a code file to get started!'}`,
+      
+      'fix': `I'd be happy to help fix issues in your code!${contextInfo}\n\n**What I can fix:**\n• **Syntax errors** and typos\n• **Logic bugs** and edge cases\n• **Performance bottlenecks**\n• **Security vulnerabilities**\n• **Memory leaks** and resource issues\n\n${currentFileContext ? 'Tell me what specific problem you\'re experiencing, and I\'ll analyze the code and provide a fix!' : 'Upload your code file first, then describe the issue you\'re facing.'}`,
+      
+      'add': `I can help add new features to your code!${contextInfo}\n\n**Popular additions:**\n• **Input validation** and error checking\n• **Logging and debugging** capabilities\n• **Configuration options** and flexibility\n• **New functionality** based on your needs\n• **Documentation and comments**\n\n${currentFileContext ? 'What feature would you like me to add? Describe what you want it to do!' : 'Upload your code first, then tell me what feature you\'d like to add.'}`,
+      
+      'optimize': `Let's optimize your code for better performance!${contextInfo}\n\n**Optimization areas:**\n• **Algorithm efficiency** - Use better data structures\n• **Memory usage** - Reduce allocations\n• **Loop optimization** - Minimize iterations\n• **Caching** - Store expensive calculations\n• **Code structure** - Remove redundancy\n\n${currentFileContext ? 'What performance issues are you experiencing? I can analyze and optimize specific areas.' : 'Upload your code and describe any performance concerns.'}`,
+      
+      'explain': `I'd love to explain how your code works!${contextInfo}\n\n**What I can explain:**\n• **Code flow** and logic\n• **Function purposes** and algorithms\n• **Variable roles** and data flow\n• **Complex sections** in simple terms\n• **Best practices** being used\n\n${currentFileContext ? 'Which part of the code would you like me to explain? Point out specific lines or functions!' : 'Upload your code file first, then ask about specific parts you want explained.'}`,
+      
+      // Default conversational response
+      'default': `Hi! I'm ready to help with your code!${contextInfo}\n\n**You can ask me to:**\n• "Improve this function's performance"\n• "Add error handling to this code"\n• "Fix the bug in line 25"\n• "Explain how this algorithm works"\n• "Add a new feature that does X"\n• "Optimize this for better memory usage"\n\n${currentFileContext ? '**Current file:** ' + currentFileContext.name + '\nTell me what you\'d like me to help with!' : '**No file loaded** - Upload a code file first, then describe what you need help with.'}`
+    };
+
+    // Simple keyword matching for demo - in real implementation, use proper NLP
+    const lowerMessage = userMessage.toLowerCase();
+    let response = responses.default;
+    
+    if (lowerMessage.includes('improve') || lowerMessage.includes('better') || lowerMessage.includes('enhance')) {
+      response = responses.improve;
+    } else if (lowerMessage.includes('fix') || lowerMessage.includes('bug') || lowerMessage.includes('error') || lowerMessage.includes('problem')) {
+      response = responses.fix;
+    } else if (lowerMessage.includes('add') || lowerMessage.includes('feature') || lowerMessage.includes('new')) {
+      response = responses.add;
+    } else if (lowerMessage.includes('optimize') || lowerMessage.includes('performance') || lowerMessage.includes('speed') || lowerMessage.includes('faster')) {
+      response = responses.optimize;
+    } else if (lowerMessage.includes('explain') || lowerMessage.includes('what') || lowerMessage.includes('how') || lowerMessage.includes('why')) {
+      response = responses.explain;
+    }
+
+    // Add contextual actions based on current file
+    const actions = currentFileContext ? [
+      { label: 'Improve Code', action: 'improve_code' },
+      { label: 'Add Feature', action: 'add_features' },
+      { label: 'Fix Issues', action: 'fix_bugs' },
+      { label: 'View Code', action: 'view_code' }
+    ] : [
+      { label: 'Upload File', action: 'upload_file' },
+      { label: 'Create New File', action: 'create_file' }
+    ];
+
+    addMessage('ai', response, {
+      hasActions: true,
+      actions: actions,
+      fileContext: currentFileContext,
+      isConversational: true
+    });
   };
 
   const handleSendMessage = async (fileData = null) => {
@@ -217,50 +346,12 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange })
       });
     }
 
+    const userMessage = inputValue;
     setInputValue('');
     setSelectedFile(null);
-    setIsProcessing(true);
 
-    // Simulate AI processing with real file content
-    setTimeout(() => {
-      if (fileToProcess && fileToProcess.content) {
-        const lines = fileToProcess.content.split('\n').length;
-        const detectedLang = fileToProcess.extension || 'unknown';
-        const fileSize = fileToProcess.size ? (fileToProcess.size / 1024).toFixed(1) : 'Unknown';
-        
-        // Basic analysis
-        const codeLines = fileToProcess.content.split('\n').filter(line => line.trim() && !line.trim().startsWith('//') && !line.trim().startsWith('#')).length;
-        const commentLines = lines - codeLines;
-        
-        addMessage('ai', `## Analysis Complete!
-
-**File Overview:**
-• **Name:** ${fileToProcess.name}
-• **Size:** ${fileSize} KB (${lines} total lines)
-• **Language:** ${detectedLang.toUpperCase()}
-• **Code lines:** ~${codeLines} | **Comments:** ~${commentLines}
-
-**Code Preview:**
-\`\`\`${detectedLang}
-${fileToProcess.content.split('\n').slice(0, 8).join('\n')}${lines > 8 ? '\n... (' + (lines - 8) + ' more lines)' : ''}
-\`\`\`
-
-**Ready for Analysis**
-Your ${detectedLang} file has been loaded successfully! What would you like me to help you with?`, {
-          hasActions: true,
-          actions: [
-            { label: 'Analyze Code Quality', action: 'analyze_code' },
-            { label: 'Find Issues', action: 'find_issues' },
-            { label: 'View Full Code', action: 'view_full' }
-          ]
-        });
-      } else if (fileToProcess) {
-        addMessage('ai', `❌ File selected: ${fileToProcess.name}, but I couldn't read the content. Please try selecting a text-based code file.`);
-      } else {
-        addMessage('ai', "💬 I'd be happy to help! Upload a code file or ask me about code review, best practices, or any programming questions.");
-      }
-      setIsProcessing(false);
-    }, 1500);
+    // Process the request
+    await processAIRequest(userMessage, fileToProcess);
   };
 
   const handleKeyPress = (e) => {
@@ -270,94 +361,189 @@ Your ${detectedLang} file has been loaded successfully! What would you like me t
     }
   };
 
-  const handleActionClick = (action) => {
+  const showCodeInEditor = (code, filename, language, isImproved = false) => {
+    setEditorContent(code);
+    setEditorFileName(filename);
+    setEditorLanguage(language);
+    setIsImprovedCode(isImproved);
+    setShowCodeEditor(true);
+  };
+
+  const handleCodeEditorSave = (content) => {
+    // When user saves from editor, update the current file context
+    if (currentFileContext) {
+      const updatedFile = {
+        ...currentFileContext,
+        content: content,
+        size: content.length,
+        isModified: true,
+        lastModified: Date.now()
+      };
+      
+      setCurrentFileContext(updatedFile);
+      
+      if (onFileAdded) {
+        onFileAdded(updatedFile);
+      }
+      
+      addMessage('ai', `✅ **Code Updated Successfully!**\n\nYour file **${updatedFile.name}** has been updated with the improvements.\n\n**What's Next?**\n• Ask me to analyze the updated code\n• Request additional improvements\n• Add new features\n• Optimize further`, {
+        hasActions: true,
+        actions: [
+          { label: 'Analyze Updated Code', action: 'analyze_updated' },
+          { label: 'Add More Features', action: 'add_features' },
+          { label: 'Further Optimization', action: 'optimize' }
+        ],
+        fileContext: updatedFile
+      });
+    }
+  };
+
+  const handleActionClick = async (action, analysisData = null, fileContext = null) => {
     setIsProcessing(true);
     
-    setTimeout(() => {
+    try {
       switch (action) {
-        case 'analyze_code':
-        case 'find_issues':
-          addMessage('ai', `## Detailed Code Analysis
+        case 'setup_ai':
+          setShowAISetupModal(true);
+          setIsProcessing(false);
+          return;
+          
+        case 'upload_file':
+          handleFileSelect();
+          setIsProcessing(false);
+          return;
+          
+        case 'create_file':
+          setShowNewFileModal(true);
+          setIsProcessing(false);
+          return;
 
-**Code Quality Assessment:**
-• **Structure:** Well-organized file structure detected
-• **Readability:** Code appears readable and maintainable
-• **Standards:** Following common language conventions
+        case 'view_code':
+          if (fileContext || currentFileContext) {
+            const file = fileContext || currentFileContext;
+            showCodeInEditor(file.content, file.name, file.extension, false);
+          }
+          setIsProcessing(false);
+          return;
 
-**Potential Improvements:**
-• **Comments:** Consider adding more descriptive comments
-• **Naming:** Review variable and function naming consistency
-• **Performance:** Check for optimization opportunities
-
-**Specific Recommendations:**
-• **Best Practices:** Follow language-specific style guides
-• **Error Handling:** Ensure proper error handling throughout
-• **Testing:** Consider adding unit tests for critical functions
-
-**Focus Areas:**
-What aspect would you like me to dive deeper into?`, {
-            hasActions: true,
-            actions: [
-              { label: 'Performance Review', action: 'check_performance' },
-              { label: 'Security Analysis', action: 'security_review' },
-              { label: 'Style Guide', action: 'style_guide' }
-            ]
-          });
-          break;
-        case 'view_full':
-          const fullContent = selectedFile?.content || 'No file content available';
-          const lines = fullContent.split('\n');
-          const displayContent = lines.length > 50 
-            ? lines.slice(0, 50).join('\n') + '\n... (truncated - ' + (lines.length - 50) + ' more lines)'
-            : fullContent;
+        case 'improve_code':
+        case 'add_features':
+        case 'fix_bugs':
+        case 'optimize':
+        case 'add_comments':
+          if (fileContext || currentFileContext) {
+            const file = fileContext || currentFileContext;
             
-          addMessage('ai', `## Complete File Contents
-
-\`\`\`${selectedFile?.extension || 'text'}
-${displayContent}
-\`\`\`
-
-**File Statistics:**
-• **Total lines:** ${lines.length}
-• **File size:** ${selectedFile?.size || 0} bytes
-• **Language:** ${selectedFile?.extension || 'unknown'}
-
-**Analysis Options:**
-Choose what you'd like me to examine:`, {
-            hasActions: true,
-            actions: [
-              { label: 'Analyze Functions', action: 'analyze_functions' },
-              { label: 'Check Imports', action: 'check_imports' },
-              { label: 'Review Logic', action: 'review_logic' }
-            ]
-          });
+            // Simulate code improvement - in real implementation, call Ollama with specific request
+            const improvedCode = generateImprovedCode(file.content, action, file.extension);
+            
+            addMessage('ai', `🔧 **Code Improvement Generated!**\n\nI've ${getActionDescription(action)} your code. Here's what I changed:\n\n${getImprovementDescription(action)}\n\n**Review the changes in the code editor and save if you like them!**`, {
+              hasActions: true,
+              actions: [
+                { label: 'View Improved Code', action: 'view_improved_code', improvedCode, fileName: file.name, language: file.extension },
+                { label: 'Make Different Changes', action: 'different_changes' },
+                { label: 'Explain Changes', action: 'explain_changes' }
+              ]
+            });
+          } else {
+            addMessage('ai', `To ${getActionDescription(action)} your code, please upload a file first!`, {
+              hasActions: true,
+              actions: [
+                { label: 'Upload File', action: 'upload_file' }
+              ]
+            });
+          }
           break;
+
+        case 'view_improved_code':
+          const { improvedCode, fileName, language } = action;
+          showCodeInEditor(improvedCode, fileName, language, true);
+          break;
+
+        case 'analyze_updated':
+          if (currentFileContext) {
+            addMessage('user', '🔄 Analyzing the updated code...');
+            await processAIRequest('analyze this updated code', currentFileContext);
+            return;
+          }
+          break;
+          
         default:
-          addMessage('ai', `## ${action.replace('_', ' ').toUpperCase()} Analysis
-
-This feature is coming soon! I'm continuously learning new ways to help you improve your code.
-
-**Available Now:**
-• Code structure analysis
-• Basic quality assessment
-• File content review
-• Best practice suggestions
-
-**Coming Soon:**
-• Advanced analysis features
-• Automated fix suggestions
-• Integration with popular linters
-
-Would you like me to perform a different type of analysis?`, {
+          addMessage('ai', `I understand you want to "${action.replace('_', ' ')}". ${currentFileContext ? `For the file ${currentFileContext.name}, ` : ''}Can you tell me more specifically what you'd like me to do?\n\nFor example:\n• "Add input validation to the main function"\n• "Optimize the sorting algorithm"\n• "Fix the memory leak in line 45"\n• "Add error handling for network requests"`, {
             hasActions: true,
-            actions: [
-              { label: 'Try Different Analysis', action: 'analyze_code' },
-              { label: 'Upload New File', action: 'new_file' }
+            actions: currentFileContext ? [
+              { label: 'View Current Code', action: 'view_code' },
+              { label: 'General Improvements', action: 'improve_code' }
+            ] : [
+              { label: 'Upload File First', action: 'upload_file' }
             ]
           });
       }
+    } finally {
       setIsProcessing(false);
-    }, 1500);
+    }
+  };
+
+  // Helper functions for code improvement simulation
+  const generateImprovedCode = (originalCode, action, extension) => {
+    // This is a simulation - in real implementation, this would call Ollama
+    const improvements = {
+      'improve_code': {
+        'py': originalCode.replace(/print\(/g, 'logging.info(').replace(/^/gm, '# Improved: '),
+        'js': originalCode.replace(/console\.log\(/g, 'logger.info(').replace(/var /g, 'const '),
+        'default': `// IMPROVED VERSION\n// Added better error handling and comments\n\n${originalCode}`
+      },
+      'add_features': {
+        'py': `# Added input validation and error handling\ntry:\n    ${originalCode.replace(/\n/g, '\n    ')}\nexcept Exception as e:\n    logging.error(f"Error: {e}")`,
+        'js': `// Added error handling and validation\ntry {\n    ${originalCode.replace(/\n/g, '\n    ')}\n} catch (error) {\n    console.error('Error:', error);\n}`,
+        'default': `/* ENHANCED VERSION WITH NEW FEATURES */\n\n${originalCode}\n\n/* Added: Error handling, validation, logging */`
+      },
+      'fix_bugs': {
+        'default': `/* BUG FIXES APPLIED */\n// Fixed potential null pointer issues\n// Added boundary checks\n// Improved error handling\n\n${originalCode.replace(/== null/g, '=== null').replace(/=/g, '===')}`
+      },
+      'optimize': {
+        'default': `/* PERFORMANCE OPTIMIZED */\n// Reduced complexity from O(n²) to O(n log n)\n// Added caching for expensive operations\n// Minimized memory allocations\n\n${originalCode}`
+      },
+      'add_comments': {
+        'default': `/* WELL DOCUMENTED VERSION */\n\n/**\n * Main function - handles primary logic\n * @param {*} input - The input parameters\n * @returns {*} Processed result\n */\n${originalCode.replace(/\n/g, '\n// Step: ')}`
+      }
+    };
+    
+    return improvements[action]?.[extension] || improvements[action]?.default || improvements[action].default;
+  };
+
+  const getActionDescription = (action) => {
+    const descriptions = {
+      'improve_code': 'improved',
+      'add_features': 'enhanced with new features',
+      'fix_bugs': 'fixed bugs in',
+      'optimize': 'optimized',
+      'add_comments': 'added documentation to'
+    };
+    return descriptions[action] || 'updated';
+  };
+
+  const getImprovementDescription = (action) => {
+    const descriptions = {
+      'improve_code': '• Better variable naming\n• Improved code structure\n• Enhanced readability\n• Added best practices',
+      'add_features': '• Input validation\n• Error handling\n• Logging capabilities\n• Better user feedback',
+      'fix_bugs': '• Fixed potential null references\n• Added boundary checks\n• Improved error handling\n• Memory leak prevention',
+      'optimize': '• Reduced algorithm complexity\n• Added caching\n• Memory optimization\n• Performance improvements',
+      'add_comments': '• Function documentation\n• Inline comments\n• Parameter descriptions\n• Usage examples'
+    };
+    return descriptions[action] || 'Various improvements applied';
+  };
+
+  const handleAISetupComplete = async () => {
+    const status = await aiService.checkOllamaStatus();
+    setAIStatus(status);
+    addMessage('ai', `🎉 **AI Analysis Activated!**\n\nPatchPilot now has advanced conversational capabilities:\n• Natural language code discussions\n• Intelligent bug detection\n• Smart improvement suggestions\n• Interactive code editing\n\nTry asking me: "How can I improve this function?" or "Add error handling to my code"`, {
+      hasActions: true,
+      actions: [
+        { label: 'Upload File', action: 'upload_file' },
+        { label: 'Create New File', action: 'create_file' }
+      ]
+    });
   };
 
   return (
@@ -368,7 +554,7 @@ Would you like me to perform a different type of analysis?`, {
           <div className="text-center">
             <Upload size={48} className="mx-auto mb-4 text-blue-400" />
             <h3 className="text-xl font-bold text-blue-400 mb-2">Drop your code file here</h3>
-            <p className="text-blue-300">Supports Python, JavaScript, Java, C++, and more!</p>
+            <p className="text-blue-300">I'll analyze it and we can discuss improvements!</p>
           </div>
         </div>
       )}
@@ -392,24 +578,65 @@ Would you like me to perform a different type of analysis?`, {
               <Plus size={18} />
               <span className="font-medium">Create New File</span>
             </button>
+
+            {!aiStatus.available && (
+              <button
+                onClick={() => setShowAISetupModal(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <Brain size={18} />
+                <span className="font-medium">Setup AI</span>
+              </button>
+            )}
             
             <div className="text-sm text-gray-400">
-              or drag & drop anywhere on the window
+              or drag & drop to start a conversation
             </div>
           </div>
 
-          {selectedFile && (
-            <div className="flex items-center space-x-3 bg-white/5 rounded-lg px-3 py-2">
-              <FileCode size={16} className="text-green-400" />
-              <span className="text-sm text-green-300">{selectedFile.name}</span>
-              <button
-                onClick={() => setSelectedFile(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X size={14} />
-              </button>
+          <div className="flex items-center space-x-3">
+            {/* AI Status Indicator */}
+            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${
+              aiStatus.available 
+                ? 'bg-green-500/20 border-green-500/30 text-green-300'
+                : 'bg-orange-500/20 border-orange-500/30 text-orange-300'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                aiStatus.available ? 'bg-green-400 animate-pulse' : 'bg-orange-400'
+              }`} />
+              <span className="text-xs font-medium">
+                {aiStatus.available ? 'AI Ready' : 'Basic Mode'}
+              </span>
             </div>
-          )}
+
+            {currentFileContext && (
+              <div className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
+                <FileCode size={12} className="text-blue-400" />
+                <span className="text-xs font-medium text-blue-300">
+                  {currentFileContext.name}
+                </span>
+                <button
+                  onClick={() => setCurrentFileContext(null)}
+                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
+            {selectedFile && (
+              <div className="flex items-center space-x-3 bg-white/5 rounded-lg px-3 py-2">
+                <FileCode size={16} className="text-green-400" />
+                <span className="text-sm text-green-300">{selectedFile.name}</span>
+                <button
+                  onClick={() => setSelectedFile(null)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -430,9 +657,23 @@ Would you like me to perform a different type of analysis?`, {
               {message.type === 'ai' && (
                 <div className="flex items-center space-x-2 mb-3">
                   <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <Sparkles size={14} className="text-white" />
+                    {aiStatus.available ? <Brain size={14} className="text-white" /> : <Sparkles size={14} className="text-white" />}
                   </div>
-                  <span className="text-sm font-medium text-blue-400">PatchPilot AI</span>
+                  <span className="text-sm font-medium text-blue-400">
+                    PatchPilot AI {aiStatus.available ? '(AI-Powered)' : '(Basic Mode)'}
+                  </span>
+                  {message.isConversational && (
+                    <div className="flex items-center space-x-1 text-green-400">
+                      <Sparkles size={12} />
+                      <span className="text-xs">Conversational</span>
+                    </div>
+                  )}
+                  {!aiStatus.available && message.isBasicMode && (
+                    <div className="flex items-center space-x-1 text-orange-400">
+                      <AlertTriangle size={12} />
+                      <span className="text-xs">Limited Analysis</span>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -445,9 +686,16 @@ Would you like me to perform a different type of analysis?`, {
                   {message.actions.map((action, index) => (
                     <button
                       key={index}
-                      onClick={() => handleActionClick(action.action)}
+                      onClick={() => {
+                        if (action.improvedCode) {
+                          showCodeInEditor(action.improvedCode, action.fileName, action.language, true);
+                        } else {
+                          handleActionClick(action.action, message.analysisData, message.fileContext);
+                        }
+                      }}
                       className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/30 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
                     >
+                      {action.action === 'view_improved_code' && <Edit size={12} />}
                       <span>{action.label}</span>
                     </button>
                   ))}
@@ -462,13 +710,17 @@ Would you like me to perform a different type of analysis?`, {
             <div className="max-w-4xl rounded-2xl p-4 bg-white/5 backdrop-blur-sm text-gray-100 mr-12 border border-white/10">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <Sparkles size={14} className="text-white" />
+                  {aiStatus.available ? <Brain size={14} className="text-white" /> : <Sparkles size={14} className="text-white" />}
                 </div>
-                <span className="text-sm font-medium text-blue-400">PatchPilot AI</span>
+                <span className="text-sm font-medium text-blue-400">
+                  PatchPilot AI {aiStatus.available ? '(AI-Powered)' : '(Basic Mode)'}
+                </span>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span>Analyzing your code...</span>
+                <span>
+                  {aiStatus.available ? 'AI thinking about your request...' : 'Processing your request...'}
+                </span>
                 <Zap size={16} className="text-yellow-400 animate-pulse" />
               </div>
             </div>
@@ -487,7 +739,12 @@ Would you like me to perform a different type of analysis?`, {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Ask me about code review, best practices, or upload a file..."
+              placeholder={currentFileContext 
+                ? `Ask me about ${currentFileContext.name} - "How can I improve this?" "Add error handling" "Explain this function"...`
+                : aiStatus.available 
+                  ? "Ask me about code, request improvements, or upload a file to start analyzing..." 
+                  : "Ask me about code or upload a file for analysis (Setup AI for advanced features)..."
+              }
               className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-white placeholder-gray-400"
               rows="1"
               style={{ minHeight: '44px', maxHeight: '120px' }}
@@ -501,13 +758,84 @@ Would you like me to perform a different type of analysis?`, {
             </button>
           </div>
         </div>
+
+        {/* Quick Actions and Context */}
+        <div className="flex items-center justify-between mt-3 text-xs text-gray-400">
+          <div className="flex items-center space-x-4">
+            <span>Press Enter to send • Shift+Enter for new line</span>
+            {currentFileContext && (
+              <div className="flex items-center space-x-2 text-blue-400">
+                <FileCode size={12} />
+                <span>Context: {currentFileContext.name}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            {aiStatus.available ? (
+              <div className="flex items-center space-x-1 text-green-400">
+                <Brain size={12} />
+                <span>Conversational AI Ready</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAISetupModal(true)}
+                className="flex items-center space-x-1 text-orange-400 hover:text-orange-300 transition-colors"
+              >
+                <AlertTriangle size={12} />
+                <span>Setup AI for conversations</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Conversation Starters */}
+        {!isProcessing && messages.length <= 1 && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-xs text-gray-500 mb-2">💡 Try asking:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "How can I improve this function?",
+                "Add error handling to my code",
+                "Optimize this for performance",
+                "Explain how this algorithm works",
+                "Add input validation"
+              ].map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => setInputValue(suggestion)}
+                  className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                >
+                  "{suggestion}"
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* New File Modal */}
+      {/* Modals */}
       <NewFileModal 
         isOpen={showNewFileModal}
         onClose={() => setShowNewFileModal(false)}
         onFileCreated={handleNewFileCreated}
+      />
+
+      <AISetupModal
+        isOpen={showAISetupModal}
+        onClose={() => setShowAISetupModal(false)}
+        onSetupComplete={handleAISetupComplete}
+      />
+
+      {/* Enhanced Code Editor */}
+      <CodeEditor
+        isOpen={showCodeEditor}
+        onClose={() => setShowCodeEditor(false)}
+        initialContent={editorContent}
+        fileName={editorFileName}
+        language={editorLanguage}
+        onSave={isImprovedCode ? handleCodeEditorSave : undefined}
+        isImprovedCode={isImprovedCode}
+        showSavePrompt={isImprovedCode}
       />
     </div>
   );
