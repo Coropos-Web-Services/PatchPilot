@@ -1,18 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
 
-console.log('Script loaded!');
-console.log('React:', React);
-console.log('ReactDOM:', ReactDOM);
-
-const root = document.getElementById('root');
-console.log('Root element:', root);
-
-if (root) {
-  const reactRoot = ReactDOM.createRoot(root);
-  reactRoot.render(React.createElement('div', {
-    style: { background: 'red', color: 'white', padding: '20px', fontSize: '24px' }
-  }, 'HELLO FROM REACT!'));
-} else {
-  console.error('No root element found!');
-}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
