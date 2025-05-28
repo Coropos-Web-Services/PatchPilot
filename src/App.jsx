@@ -7,9 +7,9 @@ import LoadingScreen from './components/LoadingScreen';
 import InfoModal from './components/InfoModal';
 import UpdateModal from './components/UpdateModal';
 import { storageUtils } from './utils/storageUtils';
-import { aiService } from './services/aiService';
+import { enhancedAiService } from './services/enhancedAiService';
 import { updateService } from './services/updateService';
-import { Menu, FileText, X, Info, Brain } from 'lucide-react';
+import { Menu, FileText, X, Info, Brain, FolderOpen, Activity } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -26,6 +26,11 @@ function App() {
   const [aiStatus, setAIStatus] = useState({ available: false, models: [] });
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
+
+  // Enhanced states for directory support
+  const [isProcessingDirectory, setIsProcessingDirectory] = useState(false);
+  const [directoryStats, setDirectoryStats] = useState(null);
+  const [analysisProgress, setAnalysisProgress] = useState({ step: '', progress: 0, message: '' });
 
   // Initialize app with stored data or defaults
   useEffect(() => {
@@ -58,7 +63,7 @@ function App() {
             messages: [{
               id: 1,
               type: 'ai',
-              content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file onto this window, or type a message to get started.",
+              content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. \n\n**What's New:**\n• 📁 **Directory Upload** - Drag entire project folders for analysis\n• 🔄 **Real-time Progress** - See exactly what I'm doing\n• 🧠 **Enhanced AI** - Smarter conversations about your code\n\nDrag & drop any code file or folder to get started, or ask me anything about programming!",
               timestamp: new Date()
             }],
             fileCount: 0,
@@ -83,7 +88,7 @@ function App() {
           messages: [{
             id: 1,
             type: 'ai',
-            content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file onto this window, or type a message to get started.",
+            content: "👋 Welcome to PatchPilot! I'm your AI code reviewer. Drag & drop any code file or folder onto this window to start analyzing!",
             timestamp: new Date()
           }],
           fileCount: 0,
@@ -97,6 +102,28 @@ function App() {
     };
 
     initializeApp();
+  }, []);
+
+  // Initialize enhanced AI service
+  useEffect(() => {
+    const initAI = async () => {
+      try {
+        const status = await enhancedAiService.initialize();
+        setAIStatus(status);
+        
+        // Setup global progress tracking
+        const unsubscribe = enhancedAiService.onProgress((progress) => {
+          setAnalysisProgress(progress);
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Failed to initialize enhanced AI service:', error);
+        setAIStatus({ available: false, models: [], error: error.message });
+      }
+    };
+
+    initAI();
   }, []);
 
   // Save chats whenever they change
@@ -130,6 +157,24 @@ function App() {
     storageUtils.saveSettings(settings);
   }, [sidebarOpen, fileTrackerOpen]);
 
+  // Check for updates on app start
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const updateInfo = await updateService.checkForUpdates();
+        if (updateInfo?.hasUpdate && !updateService.isUpdateDismissed(updateInfo.latestVersion)) {
+          setUpdateInfo(updateInfo);
+          setShowUpdateModal(true);
+        }
+      } catch (error) {
+        console.error('Update check failed:', error);
+      }
+    };
+
+    // Check for updates after a delay
+    setTimeout(checkForUpdates, 5000);
+  }, []);
+
   const handleNewChat = () => {
     const newChat = {
       id: `chat-${Date.now()}`,
@@ -137,7 +182,7 @@ function App() {
       messages: [{
         id: 1,
         type: 'ai',
-        content: "👋 Hello! I'm PatchPilot, ready to help you review and improve your code. What can I assist you with today?",
+        content: "👋 Hello! I'm PatchPilot, ready to help you review and improve your code. What can I assist you with today?\n\n**Try:**\n• Upload a file or directory for analysis\n• Ask questions about coding best practices\n• Request specific improvements or fixes",
         timestamp: new Date()
       }],
       fileCount: 0,
@@ -148,6 +193,7 @@ function App() {
     setChats(updatedChats);
     setCurrentChatId(newChat.id);
     setChatFiles([]); // Clear files for new chat
+    setDirectoryStats(null); // Clear directory stats
   };
 
   const handleSelectChat = (chatId) => {
@@ -155,6 +201,9 @@ function App() {
     // Load files for selected chat
     const files = storageUtils.loadChatFiles(chatId);
     setChatFiles(files);
+    
+    // Clear directory stats when switching chats
+    setDirectoryStats(null);
   };
 
   const handleDeleteChat = (chatId) => {
@@ -189,7 +238,7 @@ function App() {
   const handleFileAdded = (file) => {
     const fileWithId = {
       ...file,
-      id: `file-${Date.now()}`,
+      id: `file-${Date.now()}-${Math.random()}`,
       addedAt: Date.now(),
       isModified: false
     };
@@ -209,6 +258,27 @@ function App() {
     setChats(prev => prev.map(chat => 
       chat.id === currentChatId 
         ? { ...chat, fileCount: (chatFiles.length + 1), lastModified: Date.now() }
+        : chat
+    ));
+  };
+
+  const handleMultipleFilesAdded = (files, stats) => {
+    // Add all files to chat
+    files.forEach(file => handleFileAdded(file));
+    
+    // Store directory stats for display
+    setDirectoryStats(stats);
+    
+    // Update chat with directory info
+    const directoryName = stats.directoryPath ? stats.directoryPath.split('/').pop() || 'Project' : 'Directory';
+    setChats(prev => prev.map(chat => 
+      chat.id === currentChatId 
+        ? { 
+            ...chat, 
+            name: `${directoryName} Analysis`,
+            fileCount: files.length,
+            lastModified: Date.now()
+          }
         : chat
     ));
   };
@@ -244,7 +314,9 @@ function App() {
 
   // Handle AI naming of chats
   const handleChatRename = (chatId, code, filename, userMessage = '') => {
-    const newName = aiService.generateChatName(code, filename, userMessage);
+    const newName = enhancedAiService.generateChatName ? 
+      enhancedAiService.generateChatName(code, filename, userMessage) :
+      `${filename} Analysis`;
     setChats(prev => prev.map(chat => 
       chat.id === chatId ? { ...chat, name: newName } : chat
     ));
@@ -264,10 +336,15 @@ function App() {
         <div className="absolute inset-0 bg-blue-500/30 backdrop-blur-sm border-4 border-dashed border-blue-400 z-50 flex items-center justify-center">
           <div className="text-center">
             <div className="w-24 h-24 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 mx-auto">
-              <FileText size={48} className="text-blue-400" />
+              <FolderOpen size={48} className="text-blue-400" />
             </div>
-            <h2 className="text-3xl font-bold text-blue-400 mb-2">Drop Your Code File</h2>
-            <p className="text-blue-300 text-lg">Release to upload and analyze</p>
+            <h2 className="text-3xl font-bold text-blue-400 mb-2">Drop Your Code Files or Folders</h2>
+            <p className="text-blue-300 text-lg">Single files, multiple files, or entire directories supported</p>
+            <div className="mt-4 text-sm text-blue-200">
+              <p>• Individual files: Instant analysis</p>
+              <p>• Multiple files: Batch processing</p>
+              <p>• Directories: Full project analysis</p>
+            </div>
           </div>
         </div>
       )}
@@ -286,7 +363,7 @@ function App() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
-          {/* Header */}
+          {/* Enhanced Header */}
           <header className="bg-black/20 backdrop-blur-sm border-b border-white/10 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -306,10 +383,17 @@ function App() {
                   </h1>
                   <p className="text-sm text-gray-400">
                     {currentChat?.name || 'AI-Powered Code Reviewer'}
+                    {directoryStats && (
+                      <span className="ml-2 px-2 py-0.5 bg-purple-500/20 border border-purple-500/30 rounded text-xs">
+                        {directoryStats.processedFiles} files analyzed
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
+              
               <div className="flex items-center space-x-3">
+                {/* File Tracker Toggle */}
                 <button
                   onClick={() => setFileTrackerOpen(!fileTrackerOpen)}
                   className="flex items-center space-x-2 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
@@ -318,6 +402,27 @@ function App() {
                   <span className="text-sm">Files ({chatFiles.length})</span>
                 </button>
 
+                {/* Directory Stats */}
+                {directoryStats && (
+                  <div className="flex items-center space-x-2 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full">
+                    <FolderOpen size={12} className="text-purple-400" />
+                    <span className="text-xs font-medium text-purple-300">
+                      Project: {directoryStats.codeFiles} files
+                    </span>
+                  </div>
+                )}
+
+                {/* Processing Indicator */}
+                {isProcessingDirectory && (
+                  <div className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
+                    <Activity size={12} className="text-blue-400 animate-pulse" />
+                    <span className="text-xs font-medium text-blue-300">
+                      Processing...
+                    </span>
+                  </div>
+                )}
+
+                {/* Info Button */}
                 <button
                   onClick={() => setShowInfoModal(true)}
                   className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
@@ -326,6 +431,7 @@ function App() {
                   <Info size={16} />
                 </button>
                 
+                {/* Status Indicators */}
                 <div className="flex items-center space-x-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-sm text-green-300 font-medium">Offline Ready</span>
@@ -346,6 +452,22 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Progress Bar (when processing) */}
+            {(isProcessingDirectory || analysisProgress.progress > 0) && (
+              <div className="mt-3 bg-white/5 rounded-lg p-3">
+                <div className="flex items-center justify-between text-xs text-gray-300 mb-2">
+                  <span>{analysisProgress.message || 'Processing...'}</span>
+                  <span>{Math.round(analysisProgress.progress || 0)}%</span>
+                </div>
+                <div className="bg-gray-700/50 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${analysisProgress.progress || 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </header>
 
           {/* Main Chat Interface */}
@@ -354,20 +476,25 @@ function App() {
               key={currentChatId}
               initialMessages={currentChat?.messages || []}
               onFileAdded={handleFileAdded}
+              onMultipleFilesAdded={handleMultipleFilesAdded}
               onDragStateChange={setIsDragOver}
               onMessageAdded={handleAddMessage}
               onChatRename={handleChatRename}
+              onProcessingStateChange={setIsProcessingDirectory}
               currentChatId={currentChatId}
+              aiStatus={aiStatus}
+              directoryStats={directoryStats}
             />
           </main>
         </div>
 
-        {/* File Tracker Sidebar */}
+        {/* Enhanced File Tracker Sidebar */}
         <FileTracker
           isVisible={fileTrackerOpen}
           files={chatFiles}
           onViewFile={handleViewFile}
           onEditFile={handleEditFile}
+          directoryStats={directoryStats}
         />
 
         {/* Code Editor Modal */}
@@ -377,6 +504,31 @@ function App() {
           initialContent={editorFile?.content || ''}
           fileName={editorFile?.name || 'untitled.txt'}
           language={editorFile?.extension || 'text'}
+          onSave={(content) => {
+            if (editorFile) {
+              const updatedFile = {
+                ...editorFile,
+                content: content,
+                size: content.length,
+                isModified: true,
+                lastModified: Date.now()
+              };
+              
+              // Update the file in the chat files
+              setChatFiles(prev => prev.map(f => 
+                f.id === editorFile.id ? updatedFile : f
+              ));
+              
+              // Add a message about the update
+              handleAddMessage({
+                id: Date.now(),
+                type: 'ai',
+                content: `✅ **File Updated:** ${updatedFile.name}\n\nYour changes have been saved. The file is now marked as modified and ready for re-analysis if needed.`,
+                timestamp: new Date()
+              });
+            }
+            setEditorOpen(false);
+          }}
         />
 
         {/* Info Modal */}

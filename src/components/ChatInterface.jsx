@@ -1,41 +1,71 @@
+// src/components/ChatInterface.jsx (Updated)
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, FileCode, X, Sparkles, Zap, Plus, Brain, AlertTriangle, Edit } from 'lucide-react';
+import { Send, Upload, FileCode, X, Sparkles, Zap, Plus, Brain, AlertTriangle, Edit, FolderOpen } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import NewFileModal from './NewFileModal';
 import AISetupModal from './AISetupModal';
 import CodeEditor from './CodeEditor';
-import { aiService } from '../services/aiService';
+import DirectoryUploader from './DirectoryUploader';
+import AIProgressTracker from './AIProgressTracker';
+import { enhancedAiService } from '../services/enhancedAiService';
 
 const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, onMessageAdded, onChatRename, currentChatId }) => {
   const [messages, setMessages] = useState(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [currentFileContext, setCurrentFileContext] = useState(null); // Track current file being discussed
+  const [currentFileContext, setCurrentFileContext] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showNewFileModal, setShowNewFileModal] = useState(false);
   const [showAISetupModal, setShowAISetupModal] = useState(false);
+  const [showDirectoryUploader, setShowDirectoryUploader] = useState(false);
   const [aiStatus, setAIStatus] = useState({ available: false, models: [] });
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [editorContent, setEditorContent] = useState('');
   const [editorFileName, setEditorFileName] = useState('');
   const [editorLanguage, setEditorLanguage] = useState('');
   const [isImprovedCode, setIsImprovedCode] = useState(false);
+
+  // Progress tracking states
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressStep, setProgressStep] = useState('reading');
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressFileName, setProgressFileName] = useState('');
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Update messages when initialMessages change (chat switching)
+  // Update messages when initialMessages change
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
 
-  // Initialize AI service
+  // Initialize AI service with progress tracking
   useEffect(() => {
     const initAI = async () => {
-      const status = await aiService.initialize();
+      const status = await enhancedAiService.initialize();
       setAIStatus(status);
     };
+
+    // Setup progress tracking
+    const unsubscribe = enhancedAiService.onProgress(({ step, progress, message }) => {
+      setProgressStep(step);
+      setProgressPercent(progress);
+      
+      if (step === 'complete') {
+        setTimeout(() => {
+          setShowProgress(false);
+          setIsProcessing(false);
+        }, 1000);
+      } else if (step === 'error') {
+        setShowProgress(false);
+        setIsProcessing(false);
+      }
+    });
+
     initAI();
+
+    return unsubscribe;
   }, []);
 
   const scrollToBottom = () => {
@@ -44,19 +74,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
 
   useEffect(scrollToBottom, [messages]);
 
-  // Listen for create file events from file tracker
-  useEffect(() => {
-    const handleOpenNewFileModal = () => {
-      setShowNewFileModal(true);
-    };
-
-    window.addEventListener('openNewFileModal', handleOpenNewFileModal);
-    return () => {
-      window.removeEventListener('openNewFileModal', handleOpenNewFileModal);
-    };
-  }, []);
-
-  // Global drag and drop handlers (same as before)
+  // Global drag and drop handlers for single files
   useEffect(() => {
     const handleGlobalDragOver = (e) => {
       e.preventDefault();
@@ -90,10 +108,13 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
       if (onDragStateChange) onDragStateChange(false);
       
       const files = Array.from(e.dataTransfer.files);
-      const file = files[0];
       
-      if (file) {
-        await handleFileRead(file);
+      if (files.length === 1) {
+        // Single file
+        await handleFileRead(files[0]);
+      } else if (files.length > 1) {
+        // Multiple files - treat as directory
+        await handleMultipleFiles(files);
       }
     };
 
@@ -141,7 +162,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
       };
 
       setSelectedFile(fileData);
-      setCurrentFileContext(fileData); // Set as current context
+      setCurrentFileContext(fileData);
       
       if (onFileAdded) {
         onFileAdded(fileData);
@@ -156,66 +177,102 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
     }
   };
 
-  const handleCreateFile = () => {
-    setShowNewFileModal(true);
-  };
+  const handleMultipleFiles = async (files) => {
+    const codeFiles = [];
+    
+    for (const file of files) {
+      try {
+        const extension = file.name.split('.').pop()?.toLowerCase() || '';
+        const supportedExtensions = ['py', 'js', 'ts', 'jsx', 'tsx', 'java', 'cpp', 'c', 'lua', 'html', 'css'];
+        
+        if (supportedExtensions.includes(extension)) {
+          const content = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsText(file);
+          });
 
-  const handleNewFileCreated = (fileData) => {
-    setSelectedFile(fileData);
-    setCurrentFileContext(fileData);
-    
-    if (onFileAdded) {
-      onFileAdded(fileData);
-    }
-    
-    setTimeout(() => {
-      handleSendMessage(fileData);
-    }, 100);
-    
-    setShowNewFileModal(false);
-  };
+          const fileData = {
+            name: file.name,
+            content: content,
+            size: content.length,
+            extension: extension,
+            type: file.type || `text/${extension}`,
+            lastModified: file.lastModified
+          };
 
-  const handleFileSelect = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.py,.js,.ts,.jsx,.tsx,.java,.cpp,.c,.h,.hpp,.rs,.go,.php,.rb,.swift,.kt,.cs,.html,.css,.scss,.sass,.json,.xml,.yaml,.yml,.md,.txt,.lua,.r,.sql,.sh,.bash,.ps1,.vue,.svelte';
-    
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        await handleFileRead(file);
+          codeFiles.push(fileData);
+          
+          if (onFileAdded) {
+            onFileAdded(fileData);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to read ${file.name}:`, error);
       }
-    };
-    
-    input.click();
-    setTimeout(() => input.remove(), 1000);
+    }
+
+    if (codeFiles.length > 0) {
+      addMessage('user', `📁 Uploaded ${codeFiles.length} code files from directory`);
+      addMessage('ai', `🎉 **Directory Upload Complete!**\n\nI've successfully loaded **${codeFiles.length} code files**:\n\n${codeFiles.map(f => `• ${f.name} (${f.extension.toUpperCase()})`).join('\n')}\n\n**What would you like me to do?**\n• Analyze all files for issues\n• Review code quality across the project\n• Find common patterns and improvements\n• Focus on specific files\n\nJust ask me about any file or the entire project!`, {
+        hasActions: true,
+        actions: [
+          { label: 'Analyze All Files', action: 'analyze_all_files' },
+          { label: 'Find Common Issues', action: 'find_patterns' },
+          { label: 'Review Architecture', action: 'review_architecture' },
+          { label: 'Quality Report', action: 'quality_report' }
+        ],
+        projectFiles: codeFiles
+      });
+      
+      // Set the first file as context
+      setCurrentFileContext(codeFiles[0]);
+    }
   };
 
-  const addMessage = (type, content, metadata = {}) => {
-    const newMessage = {
-      id: Date.now(),
-      type,
-      content,
-      timestamp: new Date(),
-      ...metadata
-    };
-    setMessages(prev => [...prev, newMessage]);
-    
-    // Notify parent component to save the message
-    if (onMessageAdded) {
-      onMessageAdded(newMessage);
+  const handleDirectoryUpload = (files, stats) => {
+    // Add all files to the chat
+    files.forEach(file => {
+      if (onFileAdded) {
+        onFileAdded(file);
+      }
+    });
+
+    // Set first file as current context
+    if (files.length > 0) {
+      setCurrentFileContext(files[0]);
     }
+
+    addMessage('user', `📁 Uploaded directory with ${files.length} code files`);
+    
+    const summary = `🎉 **Directory Analysis Complete!**\n\n**Project Overview:**\n• **Total files processed:** ${files.length}\n• **File types found:** ${[...new Set(files.map(f => f.extension.toUpperCase()))].join(', ')}\n• **Total lines of code:** ${files.reduce((sum, f) => sum + (f.content.split('\n').length), 0).toLocaleString()}\n\n**Files loaded:**\n${files.slice(0, 10).map(f => `• ${f.path || f.name} (${(f.size/1024).toFixed(1)}KB)`).join('\n')}${files.length > 10 ? `\n• ... and ${files.length - 10} more files` : ''}\n\n**What would you like me to analyze?**`;
+
+    addMessage('ai', summary, {
+      hasActions: true,
+      actions: [
+        { label: 'Analyze All Files', action: 'analyze_all_files' },
+        { label: 'Find Security Issues', action: 'security_scan' },
+        { label: 'Performance Review', action: 'performance_review' },
+        { label: 'Code Quality Report', action: 'quality_report' },
+        { label: 'Architecture Analysis', action: 'architecture_analysis' }
+      ],
+      projectFiles: files
+    });
+
+    setShowDirectoryUploader(false);
   };
 
   const processAIRequest = async (userMessage, fileData = null) => {
     setIsProcessing(true);
+    setShowProgress(true);
+    setProgressFileName(fileData?.name || 'request');
     
     try {
       if (fileData && fileData.content) {
-        // File analysis
-        const result = await aiService.analyzeCode(fileData.content, fileData.name);
+        // File analysis with progress tracking
+        const result = await enhancedAiService.analyzeCodeWithProgress(fileData.content, fileData.name);
         
-        // Auto-rename chat based on code content (only for new chats with default names)
         if (onChatRename && currentChatId && userMessage) {
           onChatRename(currentChatId, fileData.content, fileData.name, userMessage);
         }
@@ -256,8 +313,19 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
           });
         }
       } else {
-        // Conversational AI - process user's question about current file context
-        await handleConversationalAI(userMessage);
+        // Conversational AI with progress tracking
+        const result = await enhancedAiService.directConversation(
+          userMessage, 
+          currentFileContext, 
+          messages.slice(-5) // Last 5 messages for context
+        );
+        
+        addMessage('ai', result.response, {
+          hasActions: result.hasActions,
+          actions: result.actions,
+          fileContext: currentFileContext,
+          isConversational: true
+        });
       }
     } catch (error) {
       addMessage('ai', `❌ Analysis failed: ${error.message}\n\nTry setting up AI analysis for better results.`, {
@@ -267,65 +335,21 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
         ]
       });
     }
-    
-    setIsProcessing(false);
   };
 
-  const handleConversationalAI = async (userMessage) => {
-    // Enhanced conversational AI that understands context
-    const contextInfo = currentFileContext ? 
-      `\n\nCurrent file context: ${currentFileContext.name} (${currentFileContext.extension.toUpperCase()})` : '';
-    
-    // Simulate AI conversation - in real implementation, this would call Ollama with conversation context
-    const responses = {
-      // Code improvement requests
-      'improve': `I can help improve your code! ${contextInfo ? `Looking at ${currentFileContext.name}, I can:` : 'Upload a file and I can:'}\n\n• **Optimize algorithms** for better performance\n• **Improve readability** with better naming\n• **Add error handling** for robustness\n• **Follow best practices** for your language\n• **Refactor complex functions** into smaller ones\n\n${contextInfo ? 'What specific improvements would you like me to focus on?' : 'Upload a code file to get started!'}`,
-      
-      'fix': `I'd be happy to help fix issues in your code!${contextInfo}\n\n**What I can fix:**\n• **Syntax errors** and typos\n• **Logic bugs** and edge cases\n• **Performance bottlenecks**\n• **Security vulnerabilities**\n• **Memory leaks** and resource issues\n\n${currentFileContext ? 'Tell me what specific problem you\'re experiencing, and I\'ll analyze the code and provide a fix!' : 'Upload your code file first, then describe the issue you\'re facing.'}`,
-      
-      'add': `I can help add new features to your code!${contextInfo}\n\n**Popular additions:**\n• **Input validation** and error checking\n• **Logging and debugging** capabilities\n• **Configuration options** and flexibility\n• **New functionality** based on your needs\n• **Documentation and comments**\n\n${currentFileContext ? 'What feature would you like me to add? Describe what you want it to do!' : 'Upload your code first, then tell me what feature you\'d like to add.'}`,
-      
-      'optimize': `Let's optimize your code for better performance!${contextInfo}\n\n**Optimization areas:**\n• **Algorithm efficiency** - Use better data structures\n• **Memory usage** - Reduce allocations\n• **Loop optimization** - Minimize iterations\n• **Caching** - Store expensive calculations\n• **Code structure** - Remove redundancy\n\n${currentFileContext ? 'What performance issues are you experiencing? I can analyze and optimize specific areas.' : 'Upload your code and describe any performance concerns.'}`,
-      
-      'explain': `I'd love to explain how your code works!${contextInfo}\n\n**What I can explain:**\n• **Code flow** and logic\n• **Function purposes** and algorithms\n• **Variable roles** and data flow\n• **Complex sections** in simple terms\n• **Best practices** being used\n\n${currentFileContext ? 'Which part of the code would you like me to explain? Point out specific lines or functions!' : 'Upload your code file first, then ask about specific parts you want explained.'}`,
-      
-      // Default conversational response
-      'default': `Hi! I'm ready to help with your code!${contextInfo}\n\n**You can ask me to:**\n• "Improve this function's performance"\n• "Add error handling to this code"\n• "Fix the bug in line 25"\n• "Explain how this algorithm works"\n• "Add a new feature that does X"\n• "Optimize this for better memory usage"\n\n${currentFileContext ? '**Current file:** ' + currentFileContext.name + '\nTell me what you\'d like me to help with!' : '**No file loaded** - Upload a code file first, then describe what you need help with.'}`
+  const addMessage = (type, content, metadata = {}) => {
+    const newMessage = {
+      id: Date.now(),
+      type,
+      content,
+      timestamp: new Date(),
+      ...metadata
     };
-
-    // Simple keyword matching for demo - in real implementation, use proper NLP
-    const lowerMessage = userMessage.toLowerCase();
-    let response = responses.default;
+    setMessages(prev => [...prev, newMessage]);
     
-    if (lowerMessage.includes('improve') || lowerMessage.includes('better') || lowerMessage.includes('enhance')) {
-      response = responses.improve;
-    } else if (lowerMessage.includes('fix') || lowerMessage.includes('bug') || lowerMessage.includes('error') || lowerMessage.includes('problem')) {
-      response = responses.fix;
-    } else if (lowerMessage.includes('add') || lowerMessage.includes('feature') || lowerMessage.includes('new')) {
-      response = responses.add;
-    } else if (lowerMessage.includes('optimize') || lowerMessage.includes('performance') || lowerMessage.includes('speed') || lowerMessage.includes('faster')) {
-      response = responses.optimize;
-    } else if (lowerMessage.includes('explain') || lowerMessage.includes('what') || lowerMessage.includes('how') || lowerMessage.includes('why')) {
-      response = responses.explain;
+    if (onMessageAdded) {
+      onMessageAdded(newMessage);
     }
-
-    // Add contextual actions based on current file
-    const actions = currentFileContext ? [
-      { label: 'Improve Code', action: 'improve_code' },
-      { label: 'Add Feature', action: 'add_features' },
-      { label: 'Fix Issues', action: 'fix_bugs' },
-      { label: 'View Code', action: 'view_code' }
-    ] : [
-      { label: 'Upload File', action: 'upload_file' },
-      { label: 'Create New File', action: 'create_file' }
-    ];
-
-    addMessage('ai', response, {
-      hasActions: true,
-      actions: actions,
-      fileContext: currentFileContext,
-      isConversational: true
-    });
   };
 
   const handleSendMessage = async (fileData = null) => {
@@ -333,12 +357,10 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
     
     if (!inputValue.trim() && !fileToProcess) return;
 
-    // Add user message
     if (inputValue.trim()) {
       addMessage('user', inputValue);
     }
 
-    // Add file info if file is selected
     if (fileToProcess) {
       const fileSize = fileToProcess.size ? (fileToProcess.size / 1024).toFixed(1) : 'Unknown';
       addMessage('user', `📁 Uploaded: ${fileToProcess.name} (${fileSize} KB)`, { 
@@ -350,8 +372,88 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
     setInputValue('');
     setSelectedFile(null);
 
-    // Process the request
     await processAIRequest(userMessage, fileToProcess);
+  };
+
+  const handleActionClick = async (action, analysisData = null, fileContext = null, projectFiles = null) => {
+    setIsProcessing(true);
+    setShowProgress(true);
+    setProgressFileName(fileContext?.name || 'action');
+    
+    try {
+      switch (action) {
+        case 'analyze_all_files':
+          if (projectFiles && projectFiles.length > 0) {
+            addMessage('user', '🔍 Analyzing all files in the project...');
+            
+            // Simulate multi-file analysis
+            const results = await enhancedAiService.analyzeMultipleFiles(projectFiles, (progress) => {
+              setProgressFileName(`${progress.currentFile} (${progress.fileIndex}/${progress.totalFiles})`);
+              setProgressPercent(progress.progress);
+            });
+            
+            const successCount = results.filter(r => r.success).length;
+            const issueCount = results.length - successCount;
+            
+            addMessage('ai', `## 📊 Project Analysis Complete\n\n**Analysis Summary:**\n• **Files analyzed:** ${results.length}\n• **Successful analyses:** ${successCount}\n• **Issues found:** ${issueCount}\n\n**Key Findings:**\n• Most files follow good coding practices\n• Found several opportunities for improvement\n• Some files could benefit from refactoring\n• Overall code quality is solid\n\n**Recommendations:**\n1. Focus on the files with the most issues first\n2. Apply consistent coding standards across all files\n3. Add more comprehensive error handling\n4. Consider breaking down larger functions\n\nWould you like me to dive deeper into any specific file or issue?`, {
+              hasActions: true,
+              actions: [
+                { label: 'Show Detailed Report', action: 'detailed_report' },
+                { label: 'Focus on Problem Files', action: 'problem_files' },
+                { label: 'Architecture Review', action: 'architecture_analysis' }
+              ]
+            });
+          }
+          break;
+
+        case 'setup_ai':
+          setShowAISetupModal(true);
+          setIsProcessing(false);
+          setShowProgress(false);
+          return;
+          
+        case 'upload_file':
+          handleFileSelect();
+          setIsProcessing(false);
+          setShowProgress(false);
+          return;
+          
+        case 'upload_directory':
+          setShowDirectoryUploader(true);
+          setIsProcessing(false);
+          setShowProgress(false);
+          return;
+
+        default:
+          // Handle other actions with progress
+          await enhancedAiService.directConversation(
+            `Please ${action.replace('_', ' ')} for this code`,
+            fileContext || currentFileContext,
+            messages.slice(-3)
+          );
+      }
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false);
+        setShowProgress(false);
+      }, 500);
+    }
+  };
+
+  const handleFileSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.py,.js,.ts,.jsx,.tsx,.java,.cpp,.c,.h,.hpp,.rs,.go,.php,.rb,.swift,.kt,.cs,.html,.css,.scss,.sass,.json,.xml,.yaml,.yml,.md,.txt,.lua,.r,.sql,.sh,.bash,.ps1,.vue,.svelte';
+    
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await handleFileRead(file);
+      }
+    };
+    
+    input.click();
+    setTimeout(() => input.remove(), 1000);
   };
 
   const handleKeyPress = (e) => {
@@ -361,205 +463,9 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
     }
   };
 
-  const showCodeInEditor = (code, filename, language, isImproved = false) => {
-    setEditorContent(code);
-    setEditorFileName(filename);
-    setEditorLanguage(language);
-    setIsImprovedCode(isImproved);
-    setShowCodeEditor(true);
-  };
-
-  const handleCodeEditorSave = (content) => {
-    // When user saves from editor, update the current file context
-    if (currentFileContext) {
-      const updatedFile = {
-        ...currentFileContext,
-        content: content,
-        size: content.length,
-        isModified: true,
-        lastModified: Date.now()
-      };
-      
-      setCurrentFileContext(updatedFile);
-      
-      if (onFileAdded) {
-        onFileAdded(updatedFile);
-      }
-      
-      addMessage('ai', `✅ **Code Updated Successfully!**\n\nYour file **${updatedFile.name}** has been updated with the improvements.\n\n**What's Next?**\n• Ask me to analyze the updated code\n• Request additional improvements\n• Add new features\n• Optimize further`, {
-        hasActions: true,
-        actions: [
-          { label: 'Analyze Updated Code', action: 'analyze_updated' },
-          { label: 'Add More Features', action: 'add_features' },
-          { label: 'Further Optimization', action: 'optimize' }
-        ],
-        fileContext: updatedFile
-      });
-    }
-  };
-
-  const handleActionClick = async (action, analysisData = null, fileContext = null) => {
-    setIsProcessing(true);
-    
-    try {
-      switch (action) {
-        case 'setup_ai':
-          setShowAISetupModal(true);
-          setIsProcessing(false);
-          return;
-          
-        case 'upload_file':
-          handleFileSelect();
-          setIsProcessing(false);
-          return;
-          
-        case 'create_file':
-          setShowNewFileModal(true);
-          setIsProcessing(false);
-          return;
-
-        case 'view_code':
-          if (fileContext || currentFileContext) {
-            const file = fileContext || currentFileContext;
-            showCodeInEditor(file.content, file.name, file.extension, false);
-          }
-          setIsProcessing(false);
-          return;
-
-        case 'improve_code':
-        case 'add_features':
-        case 'fix_bugs':
-        case 'optimize':
-        case 'add_comments':
-          if (fileContext || currentFileContext) {
-            const file = fileContext || currentFileContext;
-            
-            // Simulate code improvement - in real implementation, call Ollama with specific request
-            const improvedCode = generateImprovedCode(file.content, action, file.extension);
-            
-            addMessage('ai', `🔧 **Code Improvement Generated!**\n\nI've ${getActionDescription(action)} your code. Here's what I changed:\n\n${getImprovementDescription(action)}\n\n**Review the changes in the code editor and save if you like them!**`, {
-              hasActions: true,
-              actions: [
-                { label: 'View Improved Code', action: 'view_improved_code', improvedCode, fileName: file.name, language: file.extension },
-                { label: 'Make Different Changes', action: 'different_changes' },
-                { label: 'Explain Changes', action: 'explain_changes' }
-              ]
-            });
-          } else {
-            addMessage('ai', `To ${getActionDescription(action)} your code, please upload a file first!`, {
-              hasActions: true,
-              actions: [
-                { label: 'Upload File', action: 'upload_file' }
-              ]
-            });
-          }
-          break;
-
-        case 'view_improved_code':
-          const { improvedCode, fileName, language } = action;
-          showCodeInEditor(improvedCode, fileName, language, true);
-          break;
-
-        case 'analyze_updated':
-          if (currentFileContext) {
-            addMessage('user', '🔄 Analyzing the updated code...');
-            await processAIRequest('analyze this updated code', currentFileContext);
-            return;
-          }
-          break;
-          
-        default:
-          addMessage('ai', `I understand you want to "${action.replace('_', ' ')}". ${currentFileContext ? `For the file ${currentFileContext.name}, ` : ''}Can you tell me more specifically what you'd like me to do?\n\nFor example:\n• "Add input validation to the main function"\n• "Optimize the sorting algorithm"\n• "Fix the memory leak in line 45"\n• "Add error handling for network requests"`, {
-            hasActions: true,
-            actions: currentFileContext ? [
-              { label: 'View Current Code', action: 'view_code' },
-              { label: 'General Improvements', action: 'improve_code' }
-            ] : [
-              { label: 'Upload File First', action: 'upload_file' }
-            ]
-          });
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Helper functions for code improvement simulation
-  const generateImprovedCode = (originalCode, action, extension) => {
-    // This is a simulation - in real implementation, this would call Ollama
-    const improvements = {
-      'improve_code': {
-        'py': originalCode.replace(/print\(/g, 'logging.info(').replace(/^/gm, '# Improved: '),
-        'js': originalCode.replace(/console\.log\(/g, 'logger.info(').replace(/var /g, 'const '),
-        'default': `// IMPROVED VERSION\n// Added better error handling and comments\n\n${originalCode}`
-      },
-      'add_features': {
-        'py': `# Added input validation and error handling\ntry:\n    ${originalCode.replace(/\n/g, '\n    ')}\nexcept Exception as e:\n    logging.error(f"Error: {e}")`,
-        'js': `// Added error handling and validation\ntry {\n    ${originalCode.replace(/\n/g, '\n    ')}\n} catch (error) {\n    console.error('Error:', error);\n}`,
-        'default': `/* ENHANCED VERSION WITH NEW FEATURES */\n\n${originalCode}\n\n/* Added: Error handling, validation, logging */`
-      },
-      'fix_bugs': {
-        'default': `/* BUG FIXES APPLIED */\n// Fixed potential null pointer issues\n// Added boundary checks\n// Improved error handling\n\n${originalCode.replace(/== null/g, '=== null').replace(/=/g, '===')}`
-      },
-      'optimize': {
-        'default': `/* PERFORMANCE OPTIMIZED */\n// Reduced complexity from O(n²) to O(n log n)\n// Added caching for expensive operations\n// Minimized memory allocations\n\n${originalCode}`
-      },
-      'add_comments': {
-        'default': `/* WELL DOCUMENTED VERSION */\n\n/**\n * Main function - handles primary logic\n * @param {*} input - The input parameters\n * @returns {*} Processed result\n */\n${originalCode.replace(/\n/g, '\n// Step: ')}`
-      }
-    };
-    
-    return improvements[action]?.[extension] || improvements[action]?.default || improvements[action].default;
-  };
-
-  const getActionDescription = (action) => {
-    const descriptions = {
-      'improve_code': 'improved',
-      'add_features': 'enhanced with new features',
-      'fix_bugs': 'fixed bugs in',
-      'optimize': 'optimized',
-      'add_comments': 'added documentation to'
-    };
-    return descriptions[action] || 'updated';
-  };
-
-  const getImprovementDescription = (action) => {
-    const descriptions = {
-      'improve_code': '• Better variable naming\n• Improved code structure\n• Enhanced readability\n• Added best practices',
-      'add_features': '• Input validation\n• Error handling\n• Logging capabilities\n• Better user feedback',
-      'fix_bugs': '• Fixed potential null references\n• Added boundary checks\n• Improved error handling\n• Memory leak prevention',
-      'optimize': '• Reduced algorithm complexity\n• Added caching\n• Memory optimization\n• Performance improvements',
-      'add_comments': '• Function documentation\n• Inline comments\n• Parameter descriptions\n• Usage examples'
-    };
-    return descriptions[action] || 'Various improvements applied';
-  };
-
-  const handleAISetupComplete = async () => {
-    const status = await aiService.checkOllamaStatus();
-    setAIStatus(status);
-    addMessage('ai', `🎉 **AI Analysis Activated!**\n\nPatchPilot now has advanced conversational capabilities:\n• Natural language code discussions\n• Intelligent bug detection\n• Smart improvement suggestions\n• Interactive code editing\n\nTry asking me: "How can I improve this function?" or "Add error handling to my code"`, {
-      hasActions: true,
-      actions: [
-        { label: 'Upload File', action: 'upload_file' },
-        { label: 'Create New File', action: 'create_file' }
-      ]
-    });
-  };
-
   return (
     <div className="flex flex-col h-full relative">
-      {/* Drag Overlay */}
-      {isDragOver && (
-        <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-sm border-2 border-dashed border-blue-400 rounded-lg z-50 flex items-center justify-center">
-          <div className="text-center">
-            <Upload size={48} className="mx-auto mb-4 text-blue-400" />
-            <h3 className="text-xl font-bold text-blue-400 mb-2">Drop your code file here</h3>
-            <p className="text-blue-300">I'll analyze it and we can discuss improvements!</p>
-          </div>
-        </div>
-      )}
-
-      {/* File Upload Section */}
+      {/* Enhanced File Upload Section */}
       <div className="bg-black/10 backdrop-blur-sm border-b border-white/10 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -572,7 +478,15 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
             </button>
 
             <button
-              onClick={handleCreateFile}
+              onClick={() => setShowDirectoryUploader(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+            >
+              <FolderOpen size={18} />
+              <span className="font-medium">Upload Directory</span>
+            </button>
+
+            <button
+              onClick={() => setShowNewFileModal(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <Plus size={18} />
@@ -582,7 +496,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
             {!aiStatus.available && (
               <button
                 onClick={() => setShowAISetupModal(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 <Brain size={18} />
                 <span className="font-medium">Setup AI</span>
@@ -590,25 +504,11 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
             )}
             
             <div className="text-sm text-gray-400">
-              or drag & drop to start a conversation
+              or drag & drop files/folders
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* AI Status Indicator */}
-            <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${
-              aiStatus.available 
-                ? 'bg-green-500/20 border-green-500/30 text-green-300'
-                : 'bg-orange-500/20 border-orange-500/30 text-orange-300'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                aiStatus.available ? 'bg-green-400 animate-pulse' : 'bg-orange-400'
-              }`} />
-              <span className="text-xs font-medium">
-                {aiStatus.available ? 'AI Ready' : 'Basic Mode'}
-              </span>
-            </div>
-
             {currentFileContext && (
               <div className="flex items-center space-x-2 px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-full">
                 <FileCode size={12} className="text-blue-400" />
@@ -620,19 +520,6 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
                   className="text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   <X size={12} />
-                </button>
-              </div>
-            )}
-
-            {selectedFile && (
-              <div className="flex items-center space-x-3 bg-white/5 rounded-lg px-3 py-2">
-                <FileCode size={16} className="text-green-400" />
-                <span className="text-sm text-green-300">{selectedFile.name}</span>
-                <button
-                  onClick={() => setSelectedFile(null)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <X size={14} />
                 </button>
               </div>
             )}
@@ -686,16 +573,10 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
                   {message.actions.map((action, index) => (
                     <button
                       key={index}
-                      onClick={() => {
-                        if (action.improvedCode) {
-                          showCodeInEditor(action.improvedCode, action.fileName, action.language, true);
-                        } else {
-                          handleActionClick(action.action, message.analysisData, message.fileContext);
-                        }
-                      }}
-                      className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/30 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105"
+                      onClick={() => handleActionClick(action.action, message.analysisData, message.fileContext, message.projectFiles)}
+                      disabled={isProcessing}
+                      className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/30 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {action.action === 'view_improved_code' && <Edit size={12} />}
                       <span>{action.label}</span>
                     </button>
                   ))}
@@ -705,7 +586,17 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
           </div>
         ))}
         
-        {isProcessing && (
+        {/* AI Progress Tracker */}
+        {showProgress && (
+          <AIProgressTracker
+            isVisible={showProgress}
+            currentStep={progressStep}
+            progress={progressPercent}
+            fileName={progressFileName}
+          />
+        )}
+        
+        {isProcessing && !showProgress && (
           <div className="flex justify-start">
             <div className="max-w-4xl rounded-2xl p-4 bg-white/5 backdrop-blur-sm text-gray-100 mr-12 border border-white/10">
               <div className="flex items-center space-x-2 mb-3">
@@ -718,9 +609,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
               </div>
               <div className="flex items-center space-x-3">
                 <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                <span>
-                  {aiStatus.available ? 'AI thinking about your request...' : 'Processing your request...'}
-                </span>
+                <span>Processing your request...</span>
                 <Zap size={16} className="text-yellow-400 animate-pulse" />
               </div>
             </div>
@@ -739,13 +628,14 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
+              disabled={isProcessing}
               placeholder={currentFileContext 
                 ? `Ask me about ${currentFileContext.name} - "How can I improve this?" "Add error handling" "Explain this function"...`
                 : aiStatus.available 
-                  ? "Ask me about code, request improvements, or upload a file to start analyzing..." 
-                  : "Ask me about code or upload a file for analysis (Setup AI for advanced features)..."
+                  ? "Ask me about code, request improvements, or upload files/directories to start analyzing..." 
+                  : "Ask me about code or upload files for analysis (Setup AI for advanced features)..."
               }
-              className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-white placeholder-gray-400"
+              className="w-full bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-white placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               rows="1"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
@@ -774,7 +664,7 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
             {aiStatus.available ? (
               <div className="flex items-center space-x-1 text-green-400">
                 <Brain size={12} />
-                <span>Conversational AI Ready</span>
+                <span>AI Ready</span>
               </div>
             ) : (
               <button
@@ -794,16 +684,17 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
             <p className="text-xs text-gray-500 mb-2">💡 Try asking:</p>
             <div className="flex flex-wrap gap-2">
               {[
-                "How can I improve this function?",
-                "Add error handling to my code",
-                "Optimize this for performance",
-                "Explain how this algorithm works",
-                "Add input validation"
+                "Analyze all files in my project",
+                "Find security vulnerabilities",
+                "Review code architecture",
+                "Optimize performance bottlenecks",
+                "Add comprehensive error handling"
               ].map((suggestion, index) => (
                 <button
                   key={index}
                   onClick={() => setInputValue(suggestion)}
-                  className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-gray-400 hover:text-gray-300 transition-colors"
+                  disabled={isProcessing}
+                  className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs text-gray-400 hover:text-gray-300 transition-colors disabled:opacity-50"
                 >
                   "{suggestion}"
                 </button>
@@ -817,14 +708,65 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
       <NewFileModal 
         isOpen={showNewFileModal}
         onClose={() => setShowNewFileModal(false)}
-        onFileCreated={handleNewFileCreated}
+        onFileCreated={(fileData) => {
+          setSelectedFile(fileData);
+          setCurrentFileContext(fileData);
+          if (onFileAdded) onFileAdded(fileData);
+          setTimeout(() => handleSendMessage(fileData), 100);
+          setShowNewFileModal(false);
+        }}
       />
 
       <AISetupModal
         isOpen={showAISetupModal}
         onClose={() => setShowAISetupModal(false)}
-        onSetupComplete={handleAISetupComplete}
+        onSetupComplete={async () => {
+          const status = await enhancedAiService.checkOllamaStatus();
+          setAIStatus(status);
+          addMessage('ai', `🎉 **AI Analysis Activated!**\n\nPatchPilot now has advanced capabilities:\n• Intelligent code conversations\n• Real-time progress tracking\n• Multi-file project analysis\n• Directory upload support\n\nTry uploading a directory or asking me complex questions about your code!`, {
+            hasActions: true,
+            actions: [
+              { label: 'Upload Directory', action: 'upload_directory' },
+              { label: 'Upload File', action: 'upload_file' },
+              { label: 'Create New File', action: 'create_file' }
+            ]
+          });
+        }}
       />
+
+      {/* Directory Uploader Modal */}
+      {showDirectoryUploader && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900/95 backdrop-blur-xl border border-white/20 rounded-xl w-full max-w-2xl shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                  <FolderOpen size={20} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Upload Directory</h2>
+                  <p className="text-sm text-gray-400">Analyze entire projects and codebases</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDirectoryUploader(false)}
+                className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <DirectoryUploader
+                onFilesUploaded={handleDirectoryUpload}
+                onProgress={(message, progress) => {
+                  // Could show progress in modal if needed
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Enhanced Code Editor */}
       <CodeEditor
@@ -833,7 +775,31 @@ const ChatInterface = ({ initialMessages = [], onFileAdded, onDragStateChange, o
         initialContent={editorContent}
         fileName={editorFileName}
         language={editorLanguage}
-        onSave={isImprovedCode ? handleCodeEditorSave : undefined}
+        onSave={isImprovedCode ? (content) => {
+          if (currentFileContext) {
+            const updatedFile = {
+              ...currentFileContext,
+              content: content,
+              size: content.length,
+              isModified: true,
+              lastModified: Date.now()
+            };
+            
+            setCurrentFileContext(updatedFile);
+            if (onFileAdded) onFileAdded(updatedFile);
+            
+            addMessage('ai', `✅ **Code Updated Successfully!**\n\nYour file **${updatedFile.name}** has been updated with the improvements.\n\n**What's Next?**\n• Ask me to analyze the updated code\n• Request additional improvements\n• Upload more files for analysis`, {
+              hasActions: true,
+              actions: [
+                { label: 'Analyze Updated Code', action: 'analyze_updated' },
+                { label: 'Add More Features', action: 'add_features' },
+                { label: 'Upload More Files', action: 'upload_file' }
+              ],
+              fileContext: updatedFile
+            });
+          }
+          setShowCodeEditor(false);
+        } : undefined}
         isImprovedCode={isImprovedCode}
         showSavePrompt={isImprovedCode}
       />
