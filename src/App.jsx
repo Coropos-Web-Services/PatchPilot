@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// Fixed App.jsx - Proper useEffect Dependencies
+import React, { useState, useEffect, useCallback } from 'react';
 import ChatInterface from './components/ChatInterface';
 import ChatSidebar from './components/ChatSidebar';
 import FileTracker from './components/FileTracker';
@@ -9,7 +10,7 @@ import UpdateModal from './components/UpdateModal';
 import { storageUtils } from './utils/storageUtils';
 import { contextAwareAiService } from './services/contextAwareAiService';
 import { updateService } from './services/updateService';
-import { Menu, FileText, X, Info, Brain, FolderOpen, Activity, Code2, Globe } from 'lucide-react';
+import { Menu, FileText, X, Info, Brain, FolderOpen, Activity, Code2, Globe, Sparkles } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -34,7 +35,7 @@ function App() {
   const [projectStructure, setProjectStructure] = useState(null);
   const [internetAccess, setInternetAccess] = useState(false);
 
-  // Initialize app with stored data or defaults
+  // FIXED: Initialize app with stored data - ONLY RUNS ONCE
   useEffect(() => {
     const initializeApp = () => {
       try {
@@ -55,13 +56,19 @@ function App() {
           const validChatId = storedChats.find(chat => chat.id === storedCurrentChatId)?.id || storedChats[0].id;
           setCurrentChatId(validChatId);
           
-          // Load files for current chat
+          // Load files for current chat - THIS IS CRITICAL
           const files = storageUtils.loadChatFiles(validChatId);
           setChatFiles(files);
           
-          // Update AI service context
+          // Update AI service context immediately
           if (files.length > 0) {
             contextAwareAiService.updateChatContext(files);
+            
+            // Generate project structure if multiple files
+            if (files.length > 1) {
+              const structure = contextAwareAiService.generateProjectStructureText();
+              setProjectStructure(structure);
+            }
           }
         } else {
           // Create default chat if none exist
@@ -110,9 +117,9 @@ function App() {
     };
 
     initializeApp();
-  }, []);
+  }, []); // FIXED: Empty dependency array - only runs once
 
-  // Initialize context-aware AI service
+  // FIXED: Initialize context-aware AI service - ONLY RUNS ONCE
   useEffect(() => {
     const initAI = async () => {
       try {
@@ -132,15 +139,16 @@ function App() {
     };
 
     initAI();
-  }, []);
+  }, []); // FIXED: Empty dependency array - only runs once
 
-  // Update AI context whenever chat files change
-  useEffect(() => {
-    if (chatFiles.length > 0) {
-      contextAwareAiService.updateChatContext(chatFiles);
+  // FIXED: Update AI context using useCallback to prevent infinite loops
+  const updateAIContext = useCallback((files) => {
+    if (files.length > 0) {
+      // Update AI service with current files
+      contextAwareAiService.updateChatContext(files);
       
       // Generate project structure if we have multiple files with paths
-      const hasDirectoryStructure = chatFiles.some(f => f.path && f.path.includes('/'));
+      const hasDirectoryStructure = files.some(f => f.path && f.path.includes('/'));
       if (hasDirectoryStructure) {
         const structure = contextAwareAiService.generateProjectStructureText();
         setProjectStructure(structure);
@@ -148,18 +156,25 @@ function App() {
         setProjectStructure(null);
       }
     } else {
+      // Clear context when no files
+      contextAwareAiService.updateChatContext([]);
       setProjectStructure(null);
     }
-  }, [chatFiles]);
+  }, []); // FIXED: Empty dependencies since the function doesn't depend on anything
 
-  // Save chats whenever they change
+  // FIXED: Update AI context whenever chat files change
+  useEffect(() => {
+    updateAIContext(chatFiles);
+  }, [chatFiles, updateAIContext]); // FIXED: Stable dependencies
+
+  // FIXED: Save chats with proper dependencies
   useEffect(() => {
     if (chats.length > 0) {
       storageUtils.saveChats(chats);
     }
-  }, [chats]);
+  }, [chats]); // FIXED: Only depends on chats
 
-  // Save current chat ID whenever it changes
+  // FIXED: Save current chat ID and load files - prevent infinite loop
   useEffect(() => {
     if (currentChatId) {
       storageUtils.saveCurrentChatId(currentChatId);
@@ -167,17 +182,32 @@ function App() {
       // Load files for the new chat and update AI context
       const files = storageUtils.loadChatFiles(currentChatId);
       setChatFiles(files);
+      
+      // Update directory stats if this chat has directory data
+      const currentChat = chats.find(c => c.id === currentChatId);
+      if (currentChat?.directoryStats) {
+        setDirectoryStats(currentChat.directoryStats);
+      } else {
+        setDirectoryStats(null);
+      }
     }
-  }, [currentChatId]);
+  }, [currentChatId]); // FIXED: Only depends on currentChatId, not chats
 
-  // Save chat files whenever they change
+  // FIXED: Save chat files with proper dependencies
   useEffect(() => {
     if (currentChatId && chatFiles.length >= 0) {
       storageUtils.saveChatFiles(currentChatId, chatFiles);
+      
+      // Update the chat's file count in real-time
+      setChats(prev => prev.map(chat => 
+        chat.id === currentChatId 
+          ? { ...chat, fileCount: chatFiles.length, lastModified: Date.now() }
+          : chat
+      ));
     }
-  }, [currentChatId, chatFiles]);
+  }, [currentChatId, chatFiles]); // FIXED: Stable dependencies
 
-  // Save settings when sidebar states change
+  // FIXED: Save settings with proper dependencies
   useEffect(() => {
     const settings = {
       sidebarOpen,
@@ -186,9 +216,9 @@ function App() {
       theme: 'dark'
     };
     storageUtils.saveSettings(settings);
-  }, [sidebarOpen, fileTrackerOpen, internetAccess]);
+  }, [sidebarOpen, fileTrackerOpen, internetAccess]); // FIXED: Only the actual dependencies
 
-  // Check for updates on app start
+  // FIXED: Check for updates - ONLY RUNS ONCE
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
@@ -203,9 +233,10 @@ function App() {
     };
 
     setTimeout(checkForUpdates, 5000);
-  }, []);
+  }, []); // FIXED: Empty dependency array - only runs once
 
-  const handleNewChat = () => {
+  // FIXED: Memoized event handlers to prevent unnecessary re-renders
+  const handleNewChat = useCallback(() => {
     const newChat = {
       id: `chat-${Date.now()}`,
       name: `Chat ${chats.length + 1}`,
@@ -225,35 +256,35 @@ function App() {
     setChatFiles([]);
     setDirectoryStats(null);
     setProjectStructure(null);
-  };
+  }, [chats]); // FIXED: Only depends on chats
 
-  const handleSelectChat = (chatId) => {
+  const handleSelectChat = useCallback((chatId) => {
     setCurrentChatId(chatId);
-    setDirectoryStats(null);
-  };
+    // Files will be loaded automatically by useEffect
+  }, []);
 
-  const handleDeleteChat = (chatId) => {
+  const handleDeleteChat = useCallback((chatId) => {
     if (chats.length <= 1) return;
     
     const updatedChats = chats.filter(chat => chat.id !== chatId);
     setChats(updatedChats);
     
+    // Delete associated files
     storageUtils.deleteChatFiles(chatId);
     
     if (currentChatId === chatId) {
       const newCurrentChatId = updatedChats[0]?.id || null;
       setCurrentChatId(newCurrentChatId);
     }
-  };
+  }, [chats, currentChatId]);
 
-  const handleRenameChat = (chatId, newName) => {
-    const updatedChats = chats.map(chat => 
+  const handleRenameChat = useCallback((chatId, newName) => {
+    setChats(prev => prev.map(chat => 
       chat.id === chatId ? { ...chat, name: newName } : chat
-    );
-    setChats(updatedChats);
-  };
+    ));
+  }, []);
 
-  const handleFileAdded = (file) => {
+  const handleFileAdded = useCallback((file) => {
     const fileWithId = {
       ...file,
       id: `file-${Date.now()}-${Math.random()}`,
@@ -270,49 +301,47 @@ function App() {
       }
       return [...prev, fileWithId];
     });
+  }, []);
 
-    setChats(prev => prev.map(chat => 
-      chat.id === currentChatId 
-        ? { ...chat, fileCount: chatFiles.length + 1, lastModified: Date.now() }
-        : chat
-    ));
-  };
-
-  const handleMultipleFilesAdded = (files, stats) => {
+  const handleMultipleFilesAdded = useCallback((files, stats) => {
+    // Add all files first
     files.forEach(file => handleFileAdded(file));
     
+    // Store directory stats in chat
     setDirectoryStats(stats);
     
-    const directoryName = stats.directoryPath || 'Project';
+    // Update chat with directory information
+    const directoryName = stats.directoryPath || stats.name || 'Project';
     setChats(prev => prev.map(chat => 
       chat.id === currentChatId 
         ? { 
             ...chat, 
             name: `${directoryName} Analysis`,
             fileCount: files.length,
-            lastModified: Date.now()
+            lastModified: Date.now(),
+            directoryStats: stats // Store stats in chat
           }
         : chat
     ));
-  };
+  }, [currentChatId, handleFileAdded]);
 
-  const handleViewFile = (file) => {
+  const handleViewFile = useCallback((file) => {
     setEditorFile({
       ...file,
       mode: 'view'
     });
     setEditorOpen(true);
-  };
+  }, []);
 
-  const handleEditFile = (file) => {
+  const handleEditFile = useCallback((file) => {
     setEditorFile({
       ...file,
       mode: 'edit'
     });
     setEditorOpen(true);
-  };
+  }, []);
 
-  const handleAddMessage = (message) => {
+  const handleAddMessage = useCallback((message) => {
     setChats(prev => prev.map(chat => 
       chat.id === currentChatId 
         ? { 
@@ -322,16 +351,16 @@ function App() {
           }
         : chat
     ));
-  };
+  }, [currentChatId]);
 
-  const handleChatRename = (chatId, code, filename, userMessage = '') => {
+  const handleChatRename = useCallback((chatId, code, filename, userMessage = '') => {
     const newName = generateSmartChatName(code, filename, userMessage, chatFiles);
     setChats(prev => prev.map(chat => 
       chat.id === chatId ? { ...chat, name: newName } : chat
     ));
-  };
+  }, [chatFiles]);
 
-  const generateSmartChatName = (code, filename, userMessage, allFiles) => {
+  const generateSmartChatName = useCallback((code, filename, userMessage, allFiles) => {
     if (allFiles.length > 1) {
       const languages = [...new Set(allFiles.map(f => f.extension))];
       const primaryLang = languages[0]?.toUpperCase() || 'Code';
@@ -351,13 +380,16 @@ function App() {
     } else {
       return `Coding Discussion`;
     }
-  };
+  }, []);
 
-  const toggleInternetAccess = () => {
-    setInternetAccess(prev => !prev);
-    // Notify the AI service about internet access change
-    contextAwareAiService.setInternetAccess(!internetAccess);
-  };
+  const toggleInternetAccess = useCallback(() => {
+    setInternetAccess(prev => {
+      const newValue = !prev;
+      // Notify the AI service about internet access change
+      contextAwareAiService.setInternetAccess(newValue);
+      return newValue;
+    });
+  }, []);
 
   const currentChat = chats.find(chat => chat.id === currentChatId);
 
@@ -366,17 +398,17 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white overflow-hidden relative">
+    <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-neutral-950 text-white overflow-hidden relative">
       {/* Enhanced Global Drag Overlay with Modern Colors */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/30 via-purple-500/30 to-fuchsia-500/30 backdrop-blur-sm border-4 border-dashed border-violet-400 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-indigo-600/15 to-indigo-700/20 backdrop-blur-sm border-4 border-dashed border-indigo-400 z-50 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-24 h-24 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-full flex items-center justify-center mb-4 mx-auto">
-              <Code2 size={48} className="text-violet-300" />
+            <div className="w-24 h-24 bg-gradient-to-br from-indigo-500/20 to-indigo-600/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <Code2 size={48} className="text-indigo-300" />
             </div>
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent mb-2">Drop Your Code Here</h2>
-            <p className="text-violet-200 text-lg">I'll analyze everything with full context awareness</p>
-            <div className="mt-4 text-sm text-violet-100 space-y-1">
+            <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-indigo-300 bg-clip-text text-transparent mb-2">Drop Your Code Here</h2>
+            <p className="text-indigo-200 text-lg">I'll analyze everything with full context awareness</p>
+            <div className="mt-4 text-sm text-indigo-100 space-y-1">
               <p>• 📄 **Single files:** Instant analysis</p>
               <p>• 📁 **Directories:** Full project understanding</p>
               <p>• 🧠 **Smart context:** I remember everything for our conversation</p>
@@ -400,21 +432,21 @@ function App() {
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
           {/* Enhanced Header with Modern Colors */}
-          <header className="bg-slate-900/50 backdrop-blur-xl border-b border-violet-500/20 px-6 py-4">
+          <header className="bg-slate-900/50 backdrop-blur-xl border-b border-indigo-500/20 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <button
                   onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="p-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-lg transition-colors"
+                  className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg transition-all duration-200 hover:scale-105"
                 >
                   {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
                 
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
                   <span className="text-xl">🧠</span>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-amber-400 bg-clip-text text-transparent">
                     PatchPilot
                   </h1>
                   <p className="text-sm text-gray-300">
@@ -448,7 +480,7 @@ function App() {
                 {/* File Tracker Toggle */}
                 <button
                   onClick={() => setFileTrackerOpen(!fileTrackerOpen)}
-                  className="flex items-center space-x-2 px-3 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-lg transition-colors"
+                  className="flex items-center space-x-2 px-3 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg transition-all duration-200"
                 >
                   <FileText size={16} />
                   <span className="text-sm">Files ({chatFiles.length})</span>
@@ -456,10 +488,10 @@ function App() {
 
                 {/* Project Structure Indicator */}
                 {projectStructure && (
-                  <div className="flex items-center space-x-2 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full">
-                    <FolderOpen size={12} className="text-purple-400" />
-                    <span className="text-xs font-medium text-purple-300">
-                      Project Structure
+                  <div className="flex items-center space-x-2 px-3 py-1 bg-amber-500/20 border border-amber-500/30 rounded-full">
+                    <FolderOpen size={12} className="text-amber-400" />
+                    <span className="text-xs font-medium text-amber-300">
+                      Project Loaded
                     </span>
                   </div>
                 )}
@@ -474,20 +506,10 @@ function App() {
                   </div>
                 )}
 
-                {/* Processing Indicator */}
-                {isProcessingDirectory && (
-                  <div className="flex items-center space-x-2 px-3 py-1 bg-violet-500/20 border border-violet-500/30 rounded-full">
-                    <Activity size={12} className="text-violet-400 animate-pulse" />
-                    <span className="text-xs font-medium text-violet-300">
-                      Processing...
-                    </span>
-                  </div>
-                )}
-
                 {/* Info Button */}
                 <button
                   onClick={() => setShowInfoModal(true)}
-                  className="p-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded-lg transition-colors"
+                  className="p-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg transition-all duration-200"
                   title="About PatchPilot"
                 >
                   <Info size={16} />
@@ -502,12 +524,12 @@ function App() {
                 {/* AI Status */}
                 <div className={`flex items-center space-x-2 px-3 py-1 rounded-full border ${
                   aiStatus.available 
-                    ? 'bg-violet-500/20 border-violet-500/30'
+                    ? 'bg-indigo-500/20 border-indigo-500/30'
                     : 'bg-amber-500/20 border-amber-500/30'
                 }`}>
-                  <Brain size={12} className={aiStatus.available ? 'text-violet-400' : 'text-amber-400'} />
+                  <Brain size={12} className={aiStatus.available ? 'text-indigo-400' : 'text-amber-400'} />
                   <span className={`text-xs font-medium ${
-                    aiStatus.available ? 'text-violet-300' : 'text-amber-300'
+                    aiStatus.available ? 'text-indigo-300' : 'text-amber-300'
                   }`}>
                     {aiStatus.available ? 'AI Ready' : 'Basic Mode'}
                   </span>
@@ -517,17 +539,17 @@ function App() {
 
             {/* Enhanced Progress Bar with Modern Colors */}
             {(isProcessingDirectory || analysisProgress.progress > 0) && (
-              <div className="mt-3 bg-slate-800/50 border border-violet-500/20 rounded-lg p-3">
+              <div className="mt-3 bg-slate-800/50 border border-indigo-500/20 rounded-lg p-3">
                 <div className="flex items-center justify-between text-xs text-gray-300 mb-2">
                   <span className="flex items-center space-x-2">
-                    <Brain size={12} className="text-violet-400" />
+                    <Brain size={12} className="text-indigo-400" />
                     <span>{analysisProgress.message || 'Processing with full context...'}</span>
                   </span>
                   <span>{Math.round(analysisProgress.progress || 0)}%</span>
                 </div>
                 <div className="bg-slate-700/50 rounded-full h-2 mb-2">
                   <div 
-                    className="bg-gradient-to-r from-violet-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-indigo-500 to-amber-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${analysisProgress.progress || 0}%` }}
                   />
                 </div>

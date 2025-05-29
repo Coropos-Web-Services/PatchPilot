@@ -59,31 +59,31 @@ const LoadingScreen = ({ onLoadingComplete }) => {
  const CurrentIcon = currentStepData?.icon || Code2;
 
  return (
-   <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-800 flex items-center justify-center z-50">
+   <div className="fixed inset-0 bg-gradient-to-br from-neutral-950 via-neutral-900 to-slate-800 flex items-center justify-center z-50">
      {/* Animated Background */}
      <div className="absolute inset-0 overflow-hidden">
-       <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+       <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl animate-pulse"></div>
+       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary-400/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
      </div>
 
      {/* Main Loading Content */}
      <div className="relative z-10 text-center">
        {/* Logo Section */}
        <div className="mb-8">
-         <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl mb-6 mx-auto animate-pulse">
+         <div className="w-24 h-24 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-2xl mb-6 mx-auto animate-pulse-glow">
            <span className="text-4xl">🧠</span>
          </div>
-         <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
+         <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent mb-2">
            PatchPilot
          </h1>
-         <p className="text-gray-400 text-lg">AI-Powered Code Reviewer</p>
+         <p className="text-neutral-400 text-lg">AI-Powered Code Reviewer</p>
        </div>
 
        {/* Loading Step */}
        <div className="mb-8">
          <div className="flex items-center justify-center space-x-3 mb-4">
-           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+           <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
              <CurrentIcon size={18} className="text-white" />
            </div>
            <span className="text-white text-lg font-medium">
@@ -93,13 +93,13 @@ const LoadingScreen = ({ onLoadingComplete }) => {
 
          {/* Progress Bar */}
          <div className="w-80 mx-auto">
-           <div className="bg-gray-700/50 rounded-full h-2 overflow-hidden">
+           <div className="bg-neutral-700/50 rounded-full h-2 overflow-hidden">
              <div 
-               className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-100 ease-out"
+               className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-100 ease-out"
                style={{ width: `${progress}%` }}
              ></div>
            </div>
-           <div className="flex justify-between mt-2 text-xs text-gray-500">
+           <div className="flex justify-between mt-2 text-xs text-neutral-500">
              <span>Step {currentStep + 1} of {loadingSteps.length}</span>
              <span>{Math.round(progress)}%</span>
            </div>
@@ -115,10 +115,10 @@ const LoadingScreen = ({ onLoadingComplete }) => {
                key={step.id}
                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300 ${
                  index < currentStep
-                   ? 'bg-green-500/20 border-green-500/50 text-green-400'
+                   ? 'bg-success-500/20 border-success-500/50 text-success-400'
                    : index === currentStep
-                   ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 animate-pulse'
-                   : 'bg-gray-700/30 border-gray-600/30 text-gray-500'
+                   ? 'bg-primary-500/20 border-primary-500/50 text-primary-400 animate-pulse'
+                   : 'bg-neutral-700/30 border-neutral-600/30 text-neutral-500'
                } border`}
              >
                <StepIcon size={16} />
@@ -128,23 +128,23 @@ const LoadingScreen = ({ onLoadingComplete }) => {
        </div>
 
        {/* Feature Highlights */}
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto text-sm text-gray-400">
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto text-sm text-neutral-400">
          <div className="flex items-center space-x-2">
-           <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+           <div className="w-2 h-2 bg-success-400 rounded-full status-online"></div>
            <span>Offline Ready</span>
          </div>
          <div className="flex items-center space-x-2">
-           <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+           <div className="w-2 h-2 bg-primary-400 rounded-full status-online"></div>
            <span>Chat-Based Interface</span>
          </div>
          <div className="flex items-center space-x-2">
-           <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+           <div className="w-2 h-2 bg-accent-400 rounded-full status-online"></div>
            <span>Built-in Code Editor</span>
          </div>
        </div>
 
        {/* Version Info */}
-       <div className="mt-8 text-xs text-gray-600">
+       <div className="mt-8 text-xs text-neutral-600">
          <p>PatchPilot v1.0.0</p>
          <p>Loading your coding companion...</p>
        </div>
