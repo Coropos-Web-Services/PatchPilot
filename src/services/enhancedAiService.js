@@ -6,6 +6,7 @@ export class EnhancedAIService {
     this.isInitialized = false;
     this.ollamaStatus = null;
     this.progressCallbacks = new Set();
+    this.abortRequested = false;
   }
 
   // Add progress callback
@@ -462,7 +463,24 @@ ${fileContext ? 'What would you like me to help you with regarding your code?' :
   }
 
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve, reject) => {
+      if (this.abortRequested) {
+        this.abortRequested = false;
+        return reject(new Error('Aborted'));
+      }
+      setTimeout(() => {
+        if (this.abortRequested) {
+          this.abortRequested = false;
+          reject(new Error('Aborted'));
+        } else {
+          resolve();
+        }
+      }, ms);
+    });
+  }
+
+  abort() {
+    this.abortRequested = true;
   }
 
   async checkOllamaStatus() {
