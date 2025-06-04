@@ -355,22 +355,32 @@ export class ContextAwareAIService {
 
   async generateContextualResponse(userMessage, projectContext, conversationHistory, files) {
     const lowerMessage = userMessage.toLowerCase();
-    
+
     // Build comprehensive context string for AI
     const contextString = this.buildContextString(projectContext, userMessage);
-    
+
     // Determine response type based on user intent
+    let result;
     if (this.isAnalysisRequest(lowerMessage)) {
-      return this.generateAnalysisResponse(projectContext, userMessage);
+      result = this.generateAnalysisResponse(projectContext, userMessage);
     } else if (this.isImprovementRequest(lowerMessage)) {
-      return this.generateImprovementResponse(projectContext, userMessage);
+      result = this.generateImprovementResponse(projectContext, userMessage);
     } else if (this.isExplanationRequest(lowerMessage)) {
-      return this.generateExplanationResponse(projectContext, userMessage);
+      result = this.generateExplanationResponse(projectContext, userMessage);
     } else if (this.isIssueRequest(lowerMessage)) {
-      return this.generateIssueResponse(projectContext, userMessage);
+      result = this.generateIssueResponse(projectContext, userMessage);
     } else {
-      return this.generateGeneralResponse(projectContext, userMessage);
+      result = this.generateGeneralResponse(projectContext, userMessage);
     }
+
+    if (this.internetAccess) {
+      const onlineInfo = await this.fetchOnlineHelp(userMessage);
+      if (onlineInfo) {
+        result.content += `\n\n### \ud83c\udf10 Online Reference\n${onlineInfo}`;
+      }
+    }
+
+    return result;
   }
 
   buildContextString(projectContext, userMessage) {
@@ -559,6 +569,23 @@ Upload your code and ask me anything! 🚀`,
 
   getInternetAccess() {
     return this.internetAccess;
+  }
+
+  async fetchOnlineHelp(query) {
+    if (!this.internetAccess) return null;
+    try {
+      const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1`;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.Abstract) return data.Abstract;
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        return data.RelatedTopics[0].Text;
+      }
+    } catch (error) {
+      console.error('Online search failed:', error);
+    }
+    return null;
   }
 
   async checkOllamaStatus() {
