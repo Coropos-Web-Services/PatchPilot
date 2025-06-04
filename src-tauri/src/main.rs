@@ -8,6 +8,20 @@ use serde::{Deserialize, Serialize};
 use tauri::command;
 
 #[derive(Serialize, Deserialize)]
+struct SandboxRequest {
+    code: String,
+    filename: String,
+    project_dir: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SandboxResponse {
+    status: String,
+    stdout: String,
+    stderr: String,
+}
+
+#[derive(Serialize, Deserialize)]
 struct CodeAnalysisRequest {
     code: String,
     filename: String,
