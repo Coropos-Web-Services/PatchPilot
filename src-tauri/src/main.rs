@@ -4,6 +4,7 @@
 
 use std::process::Command;
 use std::path::Path;
+use std::io::Write;
 use serde::{Deserialize, Serialize};
 use tauri::command;
 
@@ -445,6 +446,41 @@ async fn ask_question(question: String) -> Result<String, String> {
     }
 }
 
+#[command]
+async fn run_code_sandbox(request: SandboxRequest) -> Result<SandboxResponse, String> {
+    let python_script = if cfg!(debug_assertions) {
+        "../backend/processor.py"
+    } else {
+        "./backend/processor.py"
+    };
+    let mut cmd = Command::new("python3");
+    cmd.arg(python_script)
+        .arg("--run")
+        .arg(&request.filename)
+        .arg("--project_dir")
+        .arg(&request.project_dir);
+    cmd.stdin(std::process::Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn: {}", e))?;
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(request.code.as_bytes())
+        .map_err(|e| format!("Failed to write to stdin: {}", e))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to read output: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let status = if output.status.success() {
+        "success"
+    } else {
+        "error"
+    }
+    .to_string();
+    Ok(SandboxResponse { status, stdout, stderr })
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -461,7 +497,8 @@ fn main() {
             get_supported_file_extensions,
             validate_directory,
             get_system_info,
-            ask_question
+            ask_question,
+            run_code_sandbox
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
