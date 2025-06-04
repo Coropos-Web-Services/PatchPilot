@@ -9,6 +9,7 @@ import DirectoryUploader from './DirectoryUploader';
 import AIProgressTracker from './AIProgressTracker';
 import { enhancedAiService } from '../services/enhancedAiService';
 import { contextAwareAiService } from '../services/contextAwareAiService';
+import { chatbotService } from '../services/chatbotService';
 
 const ChatInterface = ({ 
   initialMessages = [], 
@@ -295,16 +296,26 @@ const ChatInterface = ({
           });
         }
       } else {
-        // UNIVERSAL CONVERSATIONAL AI - Handles ANY question!
-        let response = await generateUniversalResponse(userMessage, hasFileContext, contextFiles);
-        
-        addMessage('ai', response.content, {
-          hasActions: response.hasActions || false,
-          actions: response.actions || [],
-          fileContext: currentFileContext,
-          isConversational: true,
-          isContextAware: hasFileContext
-        });
+        // General conversation handled by local AI
+        const chatResult = await chatbotService.ask(userMessage);
+
+        if (chatResult.success) {
+          addMessage('ai', chatResult.response, {
+            fileContext: currentFileContext,
+            isConversational: true,
+            isContextAware: hasFileContext
+          });
+        } else {
+          // Fallback to simple canned responses if AI fails
+          let response = await generateUniversalResponse(userMessage, hasFileContext, contextFiles);
+          addMessage('ai', response.content, {
+            hasActions: response.hasActions || false,
+            actions: response.actions || [],
+            fileContext: currentFileContext,
+            isConversational: true,
+            isContextAware: hasFileContext
+          });
+        }
       }
     } catch (error) {
       addMessage('ai', `❌ I encountered an error: ${error.message}\n\nPlease try rephrasing your question or check if all services are running properly.`, {

@@ -40,3 +40,12 @@ Powered by [Ollama](https://ollama.com) and your desktop's development environme
 ### 🔧 Install
 
 coming soon.
+
+### 🧠 Built-in AI Assistant
+
+PatchPilot ships with an integrated AI assistant powered by your locally
+installed Ollama model. Once a model is pulled, simply launch the desktop app
+and start asking questions or drop your code files for analysis – no cloud
+services required.
+
+A separate command‑line version is planned for a future paid release.
