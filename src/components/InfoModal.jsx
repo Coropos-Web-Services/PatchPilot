@@ -70,21 +70,28 @@ const InfoModal = ({ isOpen, onClose }) => {
              </ul>
            </div>
 
-           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-             <h4 className="font-semibold text-blue-300 mb-3">Created By</h4>
-             <div className="space-y-2 text-blue-100 text-sm">
-               <div>
-                 <p className="font-medium">Coropos Web Services</p>
-                 <p className="text-blue-200 text-xs">Leading web development and AI solutions</p>
-               </div>
-               <div>
-                 <p className="font-medium">Edward Quigley</p>
-                 <p className="text-blue-200 text-xs">Lead Developer & AI Integration Specialist</p>
-               </div>
-             </div>
-           </div>
-         </div>
-       );
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-300 mb-3">Created By</h4>
+            <div className="space-y-2 text-blue-100 text-sm">
+              <div>
+                <p className="font-medium">Coropos Web Services</p>
+                <p className="text-blue-200 text-xs">Leading web development and AI solutions</p>
+              </div>
+              <div>
+                <p className="font-medium">Edward Quigley</p>
+                <p className="text-blue-200 text-xs">Lead Developer & AI Integration Specialist</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+            <h4 className="font-semibold text-amber-300 mb-3">Disclaimer</h4>
+            <p className="text-amber-100 text-sm">
+              PatchPilot AI can occasionally produce incorrect or incomplete results. Always review and test any suggested code changes before relying on them.
+            </p>
+          </div>
+        </div>
+      );
 
      case 'licenses':
        return (
