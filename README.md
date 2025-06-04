@@ -10,12 +10,19 @@ Powered by [Ollama](https://ollama.com) and your desktop's development environme
 
 - 🧠 **Chat with your AI code reviewer** using natural language
 - ⚡ Fully **offline** after initial setup (no cloud needed)
+- 🌐 Optional **Online** mode fetches relevant info from the web when enabled
 - 🧪 Supports **HTML/CSS, JavaScript, Python, Java, Lua, Luau**
 - 🔍 Static analysis + sandboxed execution
 - 📝 Auto-fixes bugs and explains why
 - 📂 Reads files directly from your **Desktop**
 - 🛡️ No telemetry or tracking
 - 🌐 Optional update checks use the internet only when you initiate them and can be disabled
+
+---
+
+## ⚠️ Disclaimer
+
+PatchPilot AI can sometimes suggest incorrect or incomplete changes. Always review the modifications it proposes and thoroughly test your code before trusting the results.
 
 ---
 
