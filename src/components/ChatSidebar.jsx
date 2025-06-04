@@ -56,7 +56,7 @@ const ChatSidebar = ({
   if (!isOpen) return null;
 
   return (
-    <div className="w-64 md:w-80 bg-black/20 backdrop-blur-xl border-r border-white/10 flex flex-col h-full">
+    <div className="w-80 bg-black/20 backdrop-blur-xl border-r border-white/10 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <button

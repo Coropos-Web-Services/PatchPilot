@@ -401,7 +401,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-neutral-950 text-white overflow-auto relative">
+    <div className="h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-neutral-950 text-white overflow-hidden relative">
       {/* Enhanced Global Drag Overlay with Modern Colors */}
       {isDragOver && (
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-indigo-600/15 to-indigo-700/20 backdrop-blur-sm border-4 border-dashed border-indigo-400 z-50 flex items-center justify-center">
