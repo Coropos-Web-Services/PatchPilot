@@ -53,7 +53,7 @@ const InfoModal = ({ isOpen, onClose }) => {
              <ul className="text-gray-300 text-sm space-y-1">
                <li>• Code reviews and quality assessments</li>
                <li>• Learning and educational purposes</li>
-               <li>• Roblox/LuaU script development</li>
+              <li>• Roblox/Luau script development</li>
                <li>• Quick prototyping and experimentation</li>
                <li>• Best practice guidance and mentorship</li>
                <li>• Bug fixing and performance optimization</li>

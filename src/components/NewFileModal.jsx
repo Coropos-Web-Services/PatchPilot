@@ -81,7 +81,7 @@ end
 -- Example usage
 print(greet("World"))
 `,
-      luau: `-- Roblox LuaU Script
+      luau: `-- Roblox Luau Script
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
@@ -222,7 +222,7 @@ int main() {
     python: { name: 'Python', ext: 'py', icon: '🐍' },
     javascript: { name: 'JavaScript', ext: 'js', icon: '🟨' },
     typescript: { name: 'TypeScript', ext: 'ts', icon: '🔷' },
-    lua: { name: 'Lua/LuaU', ext: 'lua', icon: '🌙' },
+    lua: { name: 'Lua/Luau', ext: 'lua', icon: '🌙' },
     java: { name: 'Java', ext: 'java', icon: '☕' },
     cpp: { name: 'C++', ext: 'cpp', icon: '⚙️' },
     html: { name: 'HTML', ext: 'html', icon: '🌐' },
@@ -318,7 +318,7 @@ int main() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Create New File</h2>
-              <p className="text-sm text-gray-400">Perfect for LuaU, Roblox scripts, or any code</p>
+              <p className="text-sm text-gray-400">Perfect for Luau, Roblox scripts, or any code</p>
             </div>
           </div>
           <button
