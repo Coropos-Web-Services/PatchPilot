@@ -1,9 +1,9 @@
 // src/components/FileTracker.jsx (Enhanced with Directory Structure)
 import React, { useState, useMemo } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
-import { FileText, Eye, Edit3, Download, RefreshCw, Clock, AlertCircle, Plus, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
+import { FileText, Eye, Edit3, Download, RefreshCw, Trash2, Clock, AlertCircle, Plus, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
 
-const FileTracker = ({ files, onViewFile, onEditFile, isVisible, directoryStats }) => {
+const FileTracker = ({ files, onViewFile, onEditFile, onDeleteFile, isVisible, directoryStats }) => {
   const [refreshingFiles, setRefreshingFiles] = useState(new Set());
   const [expandedFolders, setExpandedFolders] = useState(new Set());
   const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'list'
@@ -153,6 +153,16 @@ const FileTracker = ({ files, onViewFile, onEditFile, isVisible, directoryStats 
           <RefreshCw size={12} className={refreshingFiles.has(file.id) ? 'animate-spin' : ''} />
           <span>Sync</span>
         </button>
+
+        {onDeleteFile && (
+          <button
+            onClick={() => onDeleteFile(file.id)}
+            className="flex items-center space-x-1 px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 rounded text-xs text-red-300 hover:text-red-200 transition-colors"
+          >
+            <Trash2 size={12} />
+            <span>Remove</span>
+          </button>
+        )}
       </div>
 
       {/* File Preview */}

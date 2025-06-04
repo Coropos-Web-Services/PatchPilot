@@ -1,6 +1,6 @@
           // src/components/ChatInterface.jsx (Complete Universal AI)
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Upload, FileCode, X, Sparkles, Zap, Plus, Brain, AlertTriangle, Edit, FolderOpen } from 'lucide-react';
+import { Send, Upload, FileCode, X, CircleStop, Sparkles, Zap, Plus, Brain, AlertTriangle, Edit, FolderOpen } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import NewFileModal from './NewFileModal';
 import AISetupModal from './AISetupModal';
@@ -46,6 +46,7 @@ const ChatInterface = ({
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const abortRef = useRef(false);
 
   // Update messages when initialMessages change
   useEffect(() => {
@@ -250,6 +251,7 @@ const ChatInterface = ({
     setIsProcessing(true);
     setShowProgress(true);
     setProgressFileName(fileData?.name || 'request');
+    abortRef.current = false;
     
     try {
       const hasFileContext = chatFiles.length > 0;
@@ -258,6 +260,7 @@ const ChatInterface = ({
       if (fileData && fileData.content) {
         // File analysis
         const result = await enhancedAiService.analyzeCodeWithProgress(fileData.content, fileData.name);
+        if (abortRef.current) return;
         
         if (onChatRename && currentChatId && userMessage) {
           onChatRename(currentChatId, fileData.content, fileData.name, userMessage);
@@ -298,6 +301,7 @@ const ChatInterface = ({
       } else {
         // General conversation handled by local AI
         const chatResult = await chatbotService.ask(userMessage);
+        if (abortRef.current) return;
 
         if (chatResult.success) {
           addMessage('ai', chatResult.response, {
@@ -318,13 +322,17 @@ const ChatInterface = ({
         }
       }
     } catch (error) {
-      addMessage('ai', `❌ I encountered an error: ${error.message}\n\nPlease try rephrasing your question or check if all services are running properly.`, {
-        hasActions: true,
-        actions: [
-          { label: 'Setup AI', action: 'setup_ai' },
-          { label: 'Try Again', action: 'retry' }
-        ]
-      });
+      if (error.message === 'Aborted' || abortRef.current) {
+        addMessage('ai', '⏹️ Operation cancelled.');
+      } else {
+        addMessage('ai', `❌ I encountered an error: ${error.message}\n\nPlease try rephrasing your question or check if all services are running properly.`, {
+          hasActions: true,
+          actions: [
+            { label: 'Setup AI', action: 'setup_ai' },
+            { label: 'Try Again', action: 'retry' }
+          ]
+        });
+      }
     } finally {
       setTimeout(() => {
         setIsProcessing(false);
@@ -1171,6 +1179,15 @@ Focus on ${!hasTests ? 'testing infrastructure' : !hasConfig ? 'configuration ma
     }
   };
 
+  const handleStop = () => {
+    abortRef.current = true;
+    enhancedAiService.abort();
+    contextAwareAiService.abort();
+    setIsProcessing(false);
+    setShowProgress(false);
+    addMessage('ai', '⏹️ Operation cancelled.');
+  };
+
   return (
     <div className="flex flex-col h-full relative">
       {/* Enhanced File Upload Section */}
@@ -1311,12 +1328,20 @@ Focus on ${!hasTests ? 'testing infrastructure' : !hasConfig ? 'configuration ma
         
         {/* AI Progress Tracker */}
         {showProgress && (
-          <AIProgressTracker
-            isVisible={showProgress}
-            currentStep={progressStep}
-            progress={progressPercent}
-            fileName={progressFileName}
-          />
+          <div className="flex items-start space-x-3">
+            <AIProgressTracker
+              isVisible={showProgress}
+              currentStep={progressStep}
+              progress={progressPercent}
+              fileName={progressFileName}
+            />
+            <button
+              onClick={handleStop}
+              className="h-fit px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 rounded text-xs text-red-300 hover:text-red-200 transition-colors"
+            >
+              <CircleStop size={14} />
+            </button>
+          </div>
         )}
         
         {isProcessing && !showProgress && (
@@ -1333,12 +1358,18 @@ Focus on ${!hasTests ? 'testing infrastructure' : !hasConfig ? 'configuration ma
               <div className="flex items-center space-x-3">
                 <div className="animate-modern-spin w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
                 <span>
-                  {chatFiles.length > 0 ? 
-                    `Thinking with context of ${chatFiles.length} files...` : 
+                  {chatFiles.length > 0 ?
+                    `Thinking with context of ${chatFiles.length} files...` :
                     'Processing your question...'
                   }
                 </span>
                 <Zap size={16} className="text-amber-400 animate-pulse" />
+                <button
+                  onClick={handleStop}
+                  className="ml-3 px-2 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 rounded text-xs text-red-300 hover:text-red-200 transition-colors"
+                >
+                  <CircleStop size={12} />
+                </button>
               </div>
             </div>
           </div>
