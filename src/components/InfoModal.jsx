@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { X, Info, Shield, Book, Heart, Code2, ExternalLink, Mail, Github } from 'lucide-react';
 
+// Utility to open external links in both Tauri and browser environments
+const handleExternalLink = async (url) => {
+  if (window.__TAURI__) {
+    const { open } = await import('@tauri-apps/plugin-shell');
+    await open(url);
+  } else {
+    window.open(url, '_blank');
+  }
+};
+
 const InfoModal = ({ isOpen, onClose }) => {
  const [activeTab, setActiveTab] = useState('about');
 
@@ -120,8 +130,8 @@ const InfoModal = ({ isOpen, onClose }) => {
 
   <div className="mt-3 flex items-center space-x-2">
     <ExternalLink size={14} className="text-blue-400" />
-    <button 
-      onClick={() => open("https://github.com/coropos-web-services/patchpilot/blob/main/LICENSE.md")} 
+    <button
+      onClick={() => handleExternalLink('https://github.com/coropos-web-services/patchpilot/blob/main/LICENSE.md')}
       className="text-blue-400 hover:text-blue-300 text-sm"
     >
       View Full License on GitHub
@@ -271,25 +281,33 @@ const InfoModal = ({ isOpen, onClose }) => {
                  <div className="space-y-2 text-green-100 text-sm">
                    <div className="flex items-center space-x-2">
                      <Github size={14} />
-                     <a 
-                       href="https://github.com/coropos-web-services/patchpilot" 
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       className="text-green-300 hover:text-green-200"
-                     >
-                       GitHub Repository
-                     </a>
+                    <a
+                      href="https://github.com/coropos-web-services/patchpilot"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleExternalLink('https://github.com/coropos-web-services/patchpilot');
+                      }}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-300 hover:text-green-200"
+                    >
+                      GitHub Repository
+                    </a>
                    </div>
                    <div className="flex items-center space-x-2">
                      <ExternalLink size={14} />
-                     <a 
-                       href="https://coropos.com" 
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       className="text-green-300 hover:text-green-200"
-                     >
-                       Coropos Web Services
-                     </a>
+                    <a
+                      href="https://coropos.com"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleExternalLink('https://coropos.com');
+                      }}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-300 hover:text-green-200"
+                    >
+                      Coropos Web Services
+                    </a>
                    </div>
                    <div className="flex items-center space-x-2">
                      <Mail size={14} />
