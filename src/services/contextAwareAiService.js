@@ -1,5 +1,6 @@
 // src/services/contextAwareAiService.js
 import { invoke } from '@tauri-apps/api/core';
+import path from 'path';
 
 export class ContextAwareAIService {
   constructor() {
@@ -27,8 +28,9 @@ export class ContextAwareAIService {
 
     files.forEach(file => {
       if (file.path && (file.path.includes('/') || file.path.includes('\\'))) {
-        // File has directory structure (support Windows paths)
-        const pathParts = file.path.split(/[/\\]/);
+        // Normalize path and split using OS separator
+        const normalized = path.normalize(file.path).replace(/\\+/g, path.sep);
+        const pathParts = normalized.split(path.sep);
         const fileName = pathParts.pop();
         let currentLevel = structure;
 
