@@ -10,6 +10,7 @@ export class ContextAwareAIService {
     this.currentChatFiles = [];
     this.projectStructure = null;
     this.internetAccess = false;
+    this.abortRequested = false;
   }
 
   // Update chat context whenever files change
@@ -560,7 +561,24 @@ Upload your code and ask me anything! 🚀`,
   }
 
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve, reject) => {
+      if (this.abortRequested) {
+        this.abortRequested = false;
+        return reject(new Error('Aborted'));
+      }
+      setTimeout(() => {
+        if (this.abortRequested) {
+          this.abortRequested = false;
+          reject(new Error('Aborted'));
+        } else {
+          resolve();
+        }
+      }, ms);
+    });
+  }
+
+  abort() {
+    this.abortRequested = true;
   }
 
   setInternetAccess(enabled) {
