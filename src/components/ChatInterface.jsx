@@ -1395,6 +1395,10 @@ Focus on ${!hasTests ? 'testing infrastructure' : !hasConfig ? 'configuration ma
           </div>
         </div>
 
+        <p className="mt-2 text-amber-300 text-xs">
+          PatchPilot AI may generate inaccurate or partial code suggestions. Validate and test any code before using it.
+        </p>
+
         {/* Universal Conversation Starters */}
         {!isProcessing && messages.length <= 1 && (
           <div className="mt-4 pt-4 border-t border-indigo-500/20">

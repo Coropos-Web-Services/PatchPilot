@@ -22,7 +22,7 @@ Powered by [Ollama](https://ollama.com) and your desktop's development environme
 
 ## ⚠️ Disclaimer
 
-PatchPilot AI can sometimes suggest incorrect or incomplete changes. Always review the modifications it proposes and thoroughly test your code before trusting the results.
+PatchPilot AI may produce inaccurate or partial suggestions. Carefully validate and test any generated code before relying on it.
 
 ---
 
