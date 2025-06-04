@@ -10,6 +10,7 @@ import sys
 import os
 import tempfile
 import time
+import shutil
 from pathlib import Path
 import difflib
 from typing import Dict, List, Tuple, Optional
