@@ -1,4 +1,4 @@
-import path from 'path';
+import { normalizePath, joinPath, pathSeparator } from './browserPath.js';
 
 export function buildFileTree(files) {
   const tree = {
@@ -11,14 +11,14 @@ export function buildFileTree(files) {
 
   files.forEach(file => {
     if (file.path && (file.path.includes('/') || file.path.includes('\\'))) {
-      const normalized = path.normalize(file.path).replace(/\\+/g, path.sep);
-      const pathParts = normalized.split(path.sep);
+      const normalized = normalizePath(file.path);
+      const pathParts = normalized.split(pathSeparator);
       const fileName = pathParts.pop();
       let currentLevel = tree;
       let currentPath = '';
 
       pathParts.forEach(dirName => {
-        currentPath = currentPath ? path.join(currentPath, dirName) : dirName;
+        currentPath = currentPath ? joinPath(currentPath, dirName) : dirName;
 
         if (!currentLevel.children[dirName]) {
           currentLevel.children[dirName] = {
