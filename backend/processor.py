@@ -701,8 +701,21 @@ def main():
     input_arg = sys.argv[1]
     processor = EnhancedCodeProcessor()
     
+    # Check for run sandbox option
+    if input_arg == "--run" and len(sys.argv) >= 3:
+        file_path = sys.argv[2]
+        project_dir = os.getcwd()
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            code = f.read()
+        language = processor.detect_language(file_path, code)
+        result = processor.run_code_sandbox(
+            code,
+            language,
+            project_dir=project_dir,
+            filename=os.path.basename(file_path),
+        )
     # Check if input is a directory
-    if os.path.isdir(input_arg):
+    elif os.path.isdir(input_arg):
         print(f"Analyzing directory: {input_arg}", file=sys.stderr)
         result = processor.analyze_directory(input_arg)
     else:
