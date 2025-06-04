@@ -186,16 +186,21 @@ export const storageUtils = {
   loadSettings: () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.APP_SETTINGS);
-      return stored ? JSON.parse(stored) : {
+      const defaults = {
         sidebarOpen: true,
         fileTrackerOpen: true,
+        internetAccess: false,
         theme: 'dark'
       };
+      if (!stored) return defaults;
+      const parsed = JSON.parse(stored);
+      return { ...defaults, ...parsed };
     } catch (error) {
       console.error('❌ Failed to load settings:', error);
       return {
         sidebarOpen: true,
         fileTrackerOpen: true,
+        internetAccess: false,
         theme: 'dark'
       };
     }
