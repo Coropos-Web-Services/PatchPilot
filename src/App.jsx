@@ -344,6 +344,24 @@ function App() {
     setEditorOpen(true);
   }, []);
 
+  const handleRemoveFile = useCallback((fileId) => {
+    setChatFiles(prev => {
+      const updated = prev.filter(f => f.id !== fileId);
+      contextAwareAiService.updateChatContext(updated);
+      return updated;
+    });
+
+    const removed = chatFiles.find(f => f.id === fileId);
+    if (removed) {
+      handleAddMessage({
+        id: Date.now(),
+        type: 'ai',
+        content: `🗑️ Removed file: ${removed.name}`,
+        timestamp: new Date()
+      });
+    }
+  }, [chatFiles, handleAddMessage]);
+
   const handleAddMessage = useCallback((message) => {
     setChats(prev => prev.map(chat => 
       chat.id === currentChatId 
@@ -591,6 +609,7 @@ function App() {
           files={chatFiles}
           onViewFile={handleViewFile}
           onEditFile={handleEditFile}
+          onDeleteFile={handleRemoveFile}
           directoryStats={directoryStats}
         />
 
