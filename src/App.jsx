@@ -363,16 +363,34 @@ function App() {
   }, [chatFiles, handleAddMessage]);
 
   const handleAddMessage = useCallback((message) => {
-    setChats(prev => prev.map(chat => 
-      chat.id === currentChatId 
-        ? { 
-            ...chat, 
+    setChats(prev => prev.map(chat =>
+      chat.id === currentChatId
+        ? {
+            ...chat,
             messages: [...chat.messages, message],
             lastModified: Date.now()
           }
         : chat
     ));
   }, [currentChatId]);
+
+  const handleRemoveFile = useCallback((fileId) => {
+    setChatFiles(prev => {
+      const updated = prev.filter(f => f.id !== fileId);
+      contextAwareAiService.updateChatContext(updated);
+      return updated;
+    });
+
+    const removed = chatFiles.find(f => f.id === fileId);
+    if (removed) {
+      handleAddMessage({
+        id: Date.now(),
+        type: 'ai',
+        content: `🗑️ Removed file: ${removed.name}`,
+        timestamp: new Date()
+      });
+    }
+  }, [chatFiles, handleAddMessage]);
 
   const handleChatRename = useCallback((chatId, code, filename, userMessage = '') => {
     const newName = generateSmartChatName(code, filename, userMessage, chatFiles);
