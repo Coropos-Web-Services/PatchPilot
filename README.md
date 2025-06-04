@@ -14,7 +14,8 @@ Powered by [Ollama](https://ollama.com) and your desktop's development environme
 - 🔍 Static analysis + sandboxed execution
 - 📝 Auto-fixes bugs and explains why
 - 📂 Reads files directly from your **Desktop**
-- 🛡️ No telemetry, no tracking, no network access
+- 🛡️ No telemetry or tracking
+- 🌐 Optional update checks use the internet only when you initiate them and can be disabled
 
 ---
 
