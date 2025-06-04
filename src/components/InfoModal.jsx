@@ -87,7 +87,7 @@ const InfoModal = ({ isOpen, onClose }) => {
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
             <h4 className="font-semibold text-amber-300 mb-3">Disclaimer</h4>
             <p className="text-amber-100 text-sm">
-              PatchPilot AI can occasionally produce incorrect or incomplete results. Always review and test any suggested code changes before relying on them.
+              PatchPilot AI may generate inaccurate or partial code suggestions. Always check and test its output before using it.
             </p>
           </div>
         </div>
