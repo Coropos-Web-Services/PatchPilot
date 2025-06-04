@@ -10,7 +10,7 @@ Powered by [Ollama](https://ollama.com) and your desktop's development environme
 
 - 🧠 **Chat with your AI code reviewer** using natural language
 - ⚡ Fully **offline** after initial setup (no cloud needed)
-- 🧪 Supports **HTML/CSS, JavaScript, Python, Java, Lua, LuaU**
+- 🧪 Supports **HTML/CSS, JavaScript, Python, Java, Lua, Luau**
 - 🔍 Static analysis + sandboxed execution
 - 📝 Auto-fixes bugs and explains why
 - 📂 Reads files directly from your **Desktop**
