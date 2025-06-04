@@ -9,6 +9,7 @@ export class ContextAwareAIService {
     this.progressCallbacks = new Set();
     this.currentChatFiles = [];
     this.projectStructure = null;
+    this.internetAccess = false;
   }
 
   // Update chat context whenever files change
@@ -550,6 +551,14 @@ Upload your code and ask me anything! 🚀`,
 
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  setInternetAccess(enabled) {
+    this.internetAccess = !!enabled;
+  }
+
+  getInternetAccess() {
+    return this.internetAccess;
   }
 
   async checkOllamaStatus() {
