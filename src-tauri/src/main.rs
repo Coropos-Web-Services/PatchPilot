@@ -409,6 +409,28 @@ struct SystemInfo {
     supported_languages: Vec<String>,
 }
 
+#[command]
+async fn ask_question(question: String) -> Result<String, String> {
+    let script = if cfg!(debug_assertions) {
+        "../backend/chatbot.py"
+    } else {
+        "./backend/chatbot.py"
+    };
+
+    let output = Command::new("python3")
+        .arg(script)
+        .arg(&question)
+        .output()
+        .map_err(|e| format!("Failed to execute chatbot: {}", e))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        let err = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Chatbot failed: {}", err))
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -424,7 +446,8 @@ fn main() {
             get_desktop_path,
             get_supported_file_extensions,
             validate_directory,
-            get_system_info
+            get_system_info,
+            ask_question
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
