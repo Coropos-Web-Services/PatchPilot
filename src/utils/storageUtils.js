@@ -3,7 +3,7 @@
 // store large file contents on disk using the fs plugin and only persist file
 // metadata in localStorage. This avoids localStorage quota issues.
 
-import { writeTextFile, readTextFile, createDir, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, mkdir, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const isTauri = typeof window !== 'undefined' && window.__TAURI__;
 const DATA_DIR = 'patchpilot_files';
@@ -89,7 +89,7 @@ export const storageUtils = {
       const meta = [];
 
       if (isTauri) {
-        await createDir(`${DATA_DIR}/${chatId}`, { dir: BaseDirectory.AppData, recursive: true });
+        await mkdir(`${DATA_DIR}/${chatId}`, { dir: BaseDirectory.AppData, recursive: true });
       }
 
       for (const file of files) {
