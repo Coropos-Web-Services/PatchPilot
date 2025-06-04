@@ -148,7 +148,9 @@ function App() {
       contextAwareAiService.updateChatContext(files);
       
       // Generate project structure if we have multiple files with paths
-      const hasDirectoryStructure = files.some(f => f.path && f.path.includes('/'));
+      const hasDirectoryStructure = files.some(
+        f => f.path && (f.path.includes('/') || f.path.includes('\\'))
+      );
       if (hasDirectoryStructure) {
         const structure = contextAwareAiService.generateProjectStructureText();
         setProjectStructure(structure);

@@ -18,9 +18,9 @@ const FileTracker = ({ files, onViewFile, onEditFile, isVisible, directoryStats 
     };
 
     files.forEach(file => {
-      if (file.path && file.path.includes('/')) {
-        // File has directory structure
-        const pathParts = file.path.split('/');
+      if (file.path && (file.path.includes('/') || file.path.includes('\\'))) {
+        // File has directory structure (support Windows paths)
+        const pathParts = file.path.split(/[/\\]/);
         const fileName = pathParts.pop();
         let currentLevel = tree;
         let currentPath = '';
