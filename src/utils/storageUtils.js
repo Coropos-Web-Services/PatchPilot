@@ -1,6 +1,12 @@
 // Storage utility for chat persistence
-// Note: In a real Tauri app, you'd use the fs plugin to write to app data directory
-// For now, we'll use localStorage with better structure
+// In the browser we fall back to localStorage. When running inside Tauri we
+// store large file contents on disk using the fs plugin and only persist file
+// metadata in localStorage. This avoids localStorage quota issues.
+
+import { writeTextFile, readTextFile, createDir, BaseDirectory } from '@tauri-apps/plugin-fs';
+
+const isTauri = typeof window !== 'undefined' && window.__TAURI__;
+const DATA_DIR = 'patchpilot_files';
 
 const STORAGE_KEYS = {
   CHATS: 'patchpilot_chats',
@@ -77,15 +83,36 @@ export const storageUtils = {
   },
 
   // Save chat files (organized by chat ID)
-  saveChatFiles: (chatId, files) => {
+  saveChatFiles: async (chatId, files) => {
     try {
       const allChatFiles = storageUtils.loadAllChatFiles();
-      allChatFiles[chatId] = files.map(file => ({
-        ...file,
-        addedAt: typeof file.addedAt === 'number' ? file.addedAt : Date.now(),
-        lastModified: typeof file.lastModified === 'number' ? file.lastModified : Date.now()
-      }));
-      
+      const meta = [];
+
+      if (isTauri) {
+        await createDir(`${DATA_DIR}/${chatId}`, { dir: BaseDirectory.AppData, recursive: true });
+      }
+
+      for (const file of files) {
+        const base = {
+          id: file.id,
+          name: file.name,
+          path: file.path,
+          extension: file.extension,
+          size: file.size,
+          addedAt: typeof file.addedAt === 'number' ? file.addedAt : Date.now(),
+          lastModified: typeof file.lastModified === 'number' ? file.lastModified : Date.now()
+        };
+
+        if (isTauri && file.content) {
+          const storagePath = `${DATA_DIR}/${chatId}/${file.id}_${file.name}`;
+          await writeTextFile(storagePath, file.content, { dir: BaseDirectory.AppData });
+          meta.push({ ...base, storagePath });
+        } else {
+          meta.push({ ...base, content: file.content });
+        }
+      }
+
+      allChatFiles[chatId] = meta;
       localStorage.setItem(STORAGE_KEYS.CHAT_FILES, JSON.stringify(allChatFiles));
       return true;
     } catch (error) {
@@ -95,10 +122,25 @@ export const storageUtils = {
   },
 
   // Load files for a specific chat
-  loadChatFiles: (chatId) => {
+  loadChatFiles: async (chatId) => {
     try {
       const allChatFiles = storageUtils.loadAllChatFiles();
-      return allChatFiles[chatId] || [];
+      const stored = allChatFiles[chatId] || [];
+
+      const files = [];
+      for (const f of stored) {
+        let content = f.content || '';
+        if (!content && isTauri && f.storagePath) {
+          try {
+            content = await readTextFile(f.storagePath, { dir: BaseDirectory.AppData });
+          } catch (err) {
+            console.warn('Failed to read stored file', f.storagePath, err);
+          }
+        }
+        files.push({ ...f, content });
+      }
+
+      return files;
     } catch (error) {
       console.error('❌ Failed to load chat files:', error);
       return [];

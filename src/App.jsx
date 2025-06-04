@@ -37,7 +37,7 @@ function App() {
 
   // FIXED: Initialize app with stored data - ONLY RUNS ONCE
   useEffect(() => {
-    const initializeApp = () => {
+    const initializeApp = async () => {
       try {
         // Load settings
         const settings = storageUtils.loadSettings();
@@ -57,7 +57,7 @@ function App() {
           setCurrentChatId(validChatId);
           
           // Load files for current chat - THIS IS CRITICAL
-          const files = storageUtils.loadChatFiles(validChatId);
+          const files = await storageUtils.loadChatFiles(validChatId);
           setChatFiles(files);
           
           // Update AI service context immediately
@@ -182,8 +182,9 @@ function App() {
       storageUtils.saveCurrentChatId(currentChatId);
       
       // Load files for the new chat and update AI context
-      const files = storageUtils.loadChatFiles(currentChatId);
-      setChatFiles(files);
+      storageUtils.loadChatFiles(currentChatId).then(files => {
+        setChatFiles(files);
+      });
       
       // Update directory stats if this chat has directory data
       const currentChat = chats.find(c => c.id === currentChatId);
