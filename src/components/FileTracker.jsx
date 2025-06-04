@@ -1,5 +1,6 @@
 // src/components/FileTracker.jsx (Enhanced with Directory Structure)
 import React, { useState, useMemo } from 'react';
+import { buildFileTree } from '../utils/fileTree.js';
 import { FileText, Eye, Edit3, Download, RefreshCw, Clock, AlertCircle, Plus, Folder, FolderOpen, ChevronRight, ChevronDown } from 'lucide-react';
 
 const FileTracker = ({ files, onViewFile, onEditFile, isVisible, directoryStats }) => {
@@ -8,57 +9,7 @@ const FileTracker = ({ files, onViewFile, onEditFile, isVisible, directoryStats 
   const [viewMode, setViewMode] = useState('tree'); // 'tree' or 'list'
 
   // Build hierarchical structure for tree view
-  const fileTree = useMemo(() => {
-    const tree = {
-      name: 'Project',
-      type: 'directory',
-      children: {},
-      files: [],
-      path: ''
-    };
-
-    files.forEach(file => {
-      if (file.path && (file.path.includes('/') || file.path.includes('\\'))) {
-        // File has directory structure (support Windows paths)
-        const pathParts = file.path.split(/[/\\]/);
-        const fileName = pathParts.pop();
-        let currentLevel = tree;
-        let currentPath = '';
-
-        // Build directory tree
-        pathParts.forEach((dirName, index) => {
-          currentPath += (index === 0 ? '' : '/') + dirName;
-          
-          if (!currentLevel.children[dirName]) {
-            currentLevel.children[dirName] = {
-              name: dirName,
-              type: 'directory',
-              children: {},
-              files: [],
-              path: currentPath
-            };
-          }
-          currentLevel = currentLevel.children[dirName];
-        });
-
-        // Add file to final directory
-        currentLevel.files.push({
-          ...file,
-          displayName: fileName,
-          parentPath: currentPath
-        });
-      } else {
-        // Root level file
-        tree.files.push({
-          ...file,
-          displayName: file.name,
-          parentPath: ''
-        });
-      }
-    });
-
-    return tree;
-  }, [files]);
+  const fileTree = useMemo(() => buildFileTree(files), [files]);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 B';
