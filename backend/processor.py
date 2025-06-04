@@ -322,8 +322,63 @@ class EnhancedCodeProcessor:
         
         except Exception as e:
             print(f"Error running {linter}: {e}", file=sys.stderr)
-        
+
         return issues
+
+    def run_code_sandbox(
+        self,
+        code: str,
+        language: str,
+        timeout: int = 5,
+        project_dir: Optional[str] = None,
+        filename: str = "snippet",
+    ) -> Dict[str, str]:
+        """Execute code in an isolated sandbox directory."""
+
+        commands = {
+            "python": ["python", filename],
+            "javascript": ["node", filename],
+            "typescript": ["ts-node", filename],
+            "bash": ["bash", filename],
+        }
+
+        temp_dir = tempfile.mkdtemp()
+        if project_dir:
+            try:
+                shutil.copytree(project_dir, temp_dir, dirs_exist_ok=True)
+            except Exception:
+                pass
+
+        tmp_path = os.path.join(temp_dir, filename)
+        with open(tmp_path, "w", encoding="utf-8") as tmp:
+            tmp.write(code)
+
+        cmd = commands.get(language)
+        if not cmd:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return {"stdout": "", "stderr": f"Unsupported language: {language}", "timeout": False}
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=temp_dir,
+            )
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "timeout": False,
+            }
+        except subprocess.TimeoutExpired as e:
+            return {
+                "stdout": e.stdout or "",
+                "stderr": e.stderr or "",
+                "timeout": True,
+            }
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     def prompt_ollama_with_progress(self, code: str, language: str, filename: str, static_issues: List[Dict] = None) -> Dict:
         """Send code to Ollama for AI analysis with progress tracking"""
