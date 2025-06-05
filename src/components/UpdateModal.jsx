@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, ExternalLink, Star, Clock, AlertCircle } from 'lucide-react';
 import { updateService } from '../services/updateService';
+import { sanitizeHTML } from '../utils/sanitizeHTML.js';
 
 const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -88,10 +89,12 @@ const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
           <div>
             <h4 className="font-semibold text-white mb-2">What's New:</h4>
             <div className="bg-white/5 rounded-lg p-3 max-h-32 overflow-y-auto">
-              <div 
+              <div
                 className="text-sm text-gray-300"
-                dangerouslySetInnerHTML={{ 
-                  __html: updateService.formatReleaseNotes(updateInfo.releaseNotes) 
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHTML(
+                    updateService.formatReleaseNotes(updateInfo.releaseNotes)
+                  )
                 }}
               />
             </div>
