@@ -1,4 +1,5 @@
 import React from 'react';
+import { sanitizeHTML } from '../utils/sanitizeHTML.js';
 
 const MarkdownRenderer = ({ content }) => {
   const renderMarkdown = (text) => {
@@ -36,10 +37,12 @@ const MarkdownRenderer = ({ content }) => {
     return html;
   };
 
+  const sanitized = sanitizeHTML(renderMarkdown(content));
+
   return (
-    <div 
+    <div
       className="markdown-content"
-      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+      dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );
 };
