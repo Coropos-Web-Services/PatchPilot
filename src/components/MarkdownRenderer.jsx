@@ -1,5 +1,5 @@
 import React from 'react';
-import { sanitizeHTML } from '../utils/sanitizeHTML.js';
+import { sanitizeHTML } from '../utils/sanitizeHTML';
 
 const MarkdownRenderer = ({ content }) => {
   const renderMarkdown = (text) => {

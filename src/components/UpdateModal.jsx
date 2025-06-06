@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, ExternalLink, Star, Clock, AlertCircle } from 'lucide-react';
 import { updateService } from '../services/updateService';
-import { sanitizeHTML } from '../utils/sanitizeHTML.js';
+import { sanitizeHTML } from '../utils/sanitizeHTML';
 
 const UpdateModal = ({ isOpen, onClose, updateInfo }) => {
   const [isDownloading, setIsDownloading] = useState(false);
