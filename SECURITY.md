@@ -218,4 +218,4 @@ PatchPilot is committed to providing a secure, privacy-respecting development to
 For questions about our security practices or to report concerns, contact us at [equigley@coroposws.com](mailto:equigley@coroposws.com).
 
 ---
-*Last updated: December 2024*
+*Last updated: June 2025*
