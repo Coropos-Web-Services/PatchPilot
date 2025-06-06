@@ -1,4 +1,1 @@
-# in your repo’s .gitignore
 node_modules/
-*.min.js
-dist/
