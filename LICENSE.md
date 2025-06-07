@@ -38,7 +38,7 @@ All updates to PatchPilot must be obtained through the official distribution cha
 ## Contact
 
 To request permissions or commercial licensing, contact the original author.
-equigley@coroposws.com
+equigley@patchpilotai.com
 
 ---
 
